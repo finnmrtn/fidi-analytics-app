@@ -5,22 +5,28 @@ import SwiftUI
 final class AnalyticsViewModel {
     // Inputs
     var selectedAggregation: Aggregation = .sum
-    var selectedRange: Range = .sixMonths
+    
+    var filterStartDate: Date?
+    var filterEndDate: Date?
+    
+    private(set) var dappMetrics: [DAppMetric] = mockDAppMetrics()
 
     // Data
-    private(set) var allData: [ViewMonthCategory] = ViewMonthCategory.mockData()
+    private(set) var allData: [ViewMonthCategory] = mockViewMonthCategories()
 
     // Computed properties
     var filteredData: [ViewMonthCategory] {
-        let calendar = Calendar.current
-        let endDate = allData.map { $0.date }.max() ?? Date()
-        let startDate: Date
-        switch selectedRange {
-        case .oneMonth: startDate = calendar.date(byAdding: .month, value: -1, to: endDate)!
-        case .threeMonths: startDate = calendar.date(byAdding: .month, value: -3, to: endDate)!
-        case .sixMonths: startDate = calendar.date(byAdding: .month, value: -6, to: endDate)!
+        if let start = filterStartDate, let end = filterEndDate {
+            return allData.filter { $0.date >= start && $0.date <= end }
         }
-        return allData.filter { $0.date >= startDate && $0.date <= endDate }
+        return allData
+    }
+    
+    var filteredDAppMetrics: [DAppMetric] {
+        if let start = filterStartDate, let end = filterEndDate {
+            return dappMetrics.filter { $0.date >= start && $0.date <= end }
+        }
+        return dappMetrics
     }
 
     // Aggregated metric depending on user selection
@@ -33,6 +39,76 @@ final class AnalyticsViewModel {
             return values.reduce(0, +)
         case .avg:
             return values.reduce(0, +) / values.count
+        case .med:
+            let sorted = values.sorted()
+            if values.count % 2 == 0 {
+                let mid = values.count / 2
+                return (sorted[mid - 1] + sorted[mid]) / 2
+            } else {
+                return sorted[values.count / 2]
+            }
+        case .max:
+            return values.max() ?? 0
+        case .min:
+            return values.min() ?? 0
+        }
+    }
+    
+    var aggregatedTradingVolume: Double {
+        let values = filteredDAppMetrics.map { $0.tradingVolume ?? 0 }
+        guard !values.isEmpty else { return 0 }
+
+        switch selectedAggregation {
+        case .sum:
+            return values.reduce(0, +)
+        case .avg:
+            return values.reduce(0, +) / Double(values.count)
+        case .med:
+            let sorted = values.sorted()
+            if values.count % 2 == 0 {
+                let mid = values.count / 2
+                return (sorted[mid - 1] + sorted[mid]) / 2
+            } else {
+                return sorted[values.count / 2]
+            }
+        case .max:
+            return values.max() ?? 0
+        case .min:
+            return values.min() ?? 0
+        }
+    }
+    
+    var aggregatedUAW: Double {
+        let values = filteredDAppMetrics.map { $0.dau ?? 0 }
+        guard !values.isEmpty else { return 0 }
+        switch selectedAggregation {
+        case .sum:
+            return values.reduce(0, +)
+        case .avg:
+            return values.reduce(0, +) / Double(values.count)
+        case .med:
+            let sorted = values.sorted()
+            if values.count % 2 == 0 {
+                let mid = values.count / 2
+                return (sorted[mid - 1] + sorted[mid]) / 2
+            } else {
+                return sorted[values.count / 2]
+            }
+        case .max:
+            return values.max() ?? 0
+        case .min:
+            return values.min() ?? 0
+        }
+    }
+    
+    var aggregatedTradingFees: Double {
+        let values = filteredDAppMetrics.map { $0.tradingFees ?? 0 }
+        guard !values.isEmpty else { return 0 }
+        switch selectedAggregation {
+        case .sum:
+            return values.reduce(0, +)
+        case .avg:
+            return values.reduce(0, +) / Double(values.count)
         case .med:
             let sorted = values.sorted()
             if values.count % 2 == 0 {

@@ -13,7 +13,7 @@ import SwiftUI
 struct analyticsApp: App {
     var body: some Scene {
         WindowGroup {
-            AnalyticsView()
+            MainTabView()
         }
     }
 }

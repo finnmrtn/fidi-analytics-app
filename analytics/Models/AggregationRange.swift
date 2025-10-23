@@ -14,11 +14,5 @@ enum Aggregation: String, CaseIterable, Identifiable {
     case max = "Max"
     case min = "Min"
     var id: String { self.rawValue }
-}
-
-enum Range: String, CaseIterable, Identifiable {
-    case oneMonth = "1 Month"
-    case threeMonths = "3 Months"
-    case sixMonths = "6 Months"
-    var id: String { self.rawValue }
+    
 }
