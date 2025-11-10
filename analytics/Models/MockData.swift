@@ -62,7 +62,7 @@ struct AssetsDto: Codable {
     let pairs: [Pair]
 }
 
-// Asset-level metric rows matching AssetsMetricsDto.Metric
+//Asset-level metric rows matching AssetsMetricsDto.Metric
 struct AssetMetric: Identifiable, Codable {
     let id = UUID()
     let date: Date
