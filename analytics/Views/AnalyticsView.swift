@@ -75,10 +75,7 @@ struct AnalyticsView: View {
     @State private var filterViewModel = TimeFilterViewModel()
     @State private var showChartSheet = false
     @State private var showProjectSelector = false
-    @State private var showTransactionsSheet = false
-    @State private var showUAWsheet = false
-    @State private var showGasFeesSheet = false
-    @State private var showTxFeesSheet = false
+    @State private var presentedWidget: WidgetType?
 
     var body: some View {
         NavigationStack {
@@ -123,7 +120,7 @@ struct AnalyticsView: View {
                             iconTint: .white,
                             height: 180
                         ) {
-                            showTransactionsSheet = true
+                            presentedWidget = .transactions
                         }
                         .zIndex(1)
 
@@ -137,7 +134,7 @@ struct AnalyticsView: View {
                             iconTint: .white,
                             height: 140
                         ) {
-                            showUAWsheet = true
+                            presentedWidget = .uaw
                         }
                         .zIndex(2)
                         .offset(y: 45)
@@ -152,7 +149,7 @@ struct AnalyticsView: View {
                             iconTint: Color(hex: "#3B4A91"),
                             height: 100
                         ) {
-                            showGasFeesSheet = true
+                            presentedWidget = .gasFees
                         }
                         .zIndex(3)
                         .offset(y: 90)
@@ -167,7 +164,7 @@ struct AnalyticsView: View {
                             iconTint: Color(hex: "#FF4245"),
                             height: 60
                         ) {
-                            showTxFeesSheet = true
+                            presentedWidget = .txFees
                         }
                         .zIndex(4)
                         .offset(y: 135)
@@ -466,37 +463,24 @@ struct AnalyticsView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
         }
-        .sheet(isPresented: $showTransactionsSheet) {
-            TransactionsSheet(
-                viewModel: viewModel,
-                showSheet: $showTransactionsSheet,
-                showFilterSheet: $showFilterSheet,
-                filterViewModel: filterViewModel
-            )
+        .sheet(item: $presentedWidget) { widget in
+            sheetView(for: widget)
         }
-        .sheet(isPresented: $showUAWsheet) {
-            UAWSheet(
-                viewModel: viewModel,
-                showSheet: $showUAWsheet,
-                showFilterSheet: $showFilterSheet,
-                filterViewModel: filterViewModel
-            )
-        }
-        .sheet(isPresented: $showGasFeesSheet) {
-            GasFeesSheet(
-                viewModel: viewModel,
-                showSheet: $showGasFeesSheet,
-                showFilterSheet: $showFilterSheet,
-                filterViewModel: filterViewModel
-            )
-        }
-        .sheet(isPresented: $showTxFeesSheet) {
-            TxFeesSheet(
-                viewModel: viewModel,
-                showSheet: $showTxFeesSheet,
-                showFilterSheet: $showFilterSheet,
-                filterViewModel: filterViewModel
-            )
+    }
+}
+
+extension AnalyticsView {
+    @ViewBuilder
+    private func sheetView(for widget: WidgetType) -> some View {
+        switch widget {
+        case .transactions:
+            TransactionsSheet(viewModel: viewModel, filterViewModel: filterViewModel)
+        case .uaw:
+            UAWSheet(viewModel: viewModel, filterViewModel: filterViewModel)
+        case .gasFees:
+            GasFeesSheet(viewModel: viewModel, filterViewModel: filterViewModel)
+        case .txFees:
+            TxFeesSheet(viewModel: viewModel, filterViewModel: filterViewModel)
         }
     }
 }

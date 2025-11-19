@@ -24,8 +24,8 @@ struct TransactionsStackedChart: View {
     @Binding var selectedDate: Date?
     @Binding var selectedXPosition: CGFloat?
     let series: [StackedSeriesPoint]
-    let bucketer: TimeBucketer
-    let currentBucket: TimeBucket
+    let bucketer: MetricTimeBucketer
+    let currentBucket: MetricTimeBucket
     let style: StackedChartStyle
 
     var body: some View {
@@ -135,7 +135,7 @@ struct TransactionsStackedChart_Previews: PreviewProvider {
                 selectedDate: .constant(nil),
                 selectedXPosition: .constant(nil),
                 series: series,
-                bucketer: TimeBucketer(),
+                bucketer: MetricTimeBucketer(),
                 currentBucket: .day,
                 style: .stackedBars
             )
@@ -147,7 +147,7 @@ struct TransactionsStackedChart_Previews: PreviewProvider {
                 selectedDate: .constant(nil),
                 selectedXPosition: .constant(nil),
                 series: series,
-                bucketer: TimeBucketer(),
+                bucketer: MetricTimeBucketer(),
                 currentBucket: .day,
                 style: .stackedArea
             )
