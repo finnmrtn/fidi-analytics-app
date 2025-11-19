@@ -8,6 +8,8 @@
 import SwiftUI
 import Charts
 
+// Reusable chart utilities
+
 struct TransactionsSheet: View {
     var viewModel: AnalyticsViewModel
     @Binding var showSheet: Bool
@@ -16,6 +18,84 @@ struct TransactionsSheet: View {
 
     @State private var selectedDate: Date? = nil
     @State private var selectedXPosition: CGFloat? = nil
+
+    private let bucketer = TimeBucketer()
+
+    private var currentBucket: TimeBucket {
+        let metrics = viewModel.filteredDAppMetrics
+        guard let start = metrics.first?.date, let end = metrics.last?.date else { return .day }
+        return bucketer.bucket(from: start, to: end)
+    }
+
+    private func xAxisMarks(desiredCount: Int) -> some AxisContent {
+        bucketer.xAxisMarks(bucket: currentBucket, desiredCount: desiredCount)
+    }
+
+    // Build stacked series per date for top-10 dapps by aggregated fees over the filtered range
+    private var stackedSeries: [(date: Date, parts: [(name: String, value: Double, color: Color)])] {
+        // Use filtered metrics from the view model
+        let metrics = viewModel.filteredDAppMetrics
+        guard !metrics.isEmpty else { return [] }
+
+        // Group by dappId to compute top-10 by total fees in range
+        let byDapp = Dictionary(grouping: metrics, by: { $0.dappId })
+        let directory = mockDirectoryItems()
+        let nameById = Dictionary(uniqueKeysWithValues: directory.map { ($0.id, $0.name) })
+
+        let totals: [(id: String, name: String, total: Double)] = byDapp.map { (id, rows) in
+            let sum = rows.reduce(0) { $0 + ($1.tradingFees ?? 0) }
+            return (id, nameById[id] ?? "Project", sum)
+        }
+
+        // Filter nur DApps mit tatsächlichen Werten > 0
+        let top10 = totals.filter { $0.total > 0 }
+            .sorted { $0.total > $1.total }
+            .prefix(10)
+
+        guard !top10.isEmpty else { return [] }
+
+        let topIds: [String] = top10.map { $0.id }
+
+        // Bucket by the selected granularity for stacked bars
+        let byBucket = Dictionary(grouping: metrics.filter { topIds.contains($0.dappId) }, by: { bucketer.bucketStart(for: $0.date, bucket: currentBucket) })
+        let sortedKeys = byBucket.keys.sorted()
+
+        let series = sortedKeys.compactMap { key -> (date: Date, parts: [(name: String, value: Double, color: Color)])? in
+            let rows = byBucket[key] ?? []
+
+            // Aggregate per dapp for the bucket
+            let perDapp = Dictionary(grouping: rows, by: { $0.dappId }).mapValues { rows in
+                rows.reduce(0) { $0 + ($1.tradingFees ?? 0) }
+            }
+
+            // Map to ordered parts with fixed colors
+            let parts: [(String, Double, Color)] = topIds.enumerated().compactMap { (idx, id) in
+                let name = nameById[id] ?? "Project"
+                let value = perDapp[id] ?? 0
+                // Nur Parts mit Wert > 0 einschließen
+                guard value > 0 else { return nil }
+                let color = ChartTheme.transactionsColors[min(idx, ChartTheme.transactionsColors.count - 1)]
+                return (name, value, color)
+            }
+
+            // Nur Buckets mit mindestens einem Wert zurückgeben
+            guard !parts.isEmpty else { return nil }
+            return (key, parts)
+        }
+
+        return series
+    }
+
+    // Prüfe ob wir gültige Chart-Daten haben
+    private var hasValidChartData: Bool {
+        let series = stackedSeries
+        guard !series.isEmpty else { return false }
+
+        // Prüfe ob mindestens ein Datenpunkt mit Wert > 0 existiert
+        return series.contains { bucket in
+            bucket.parts.contains { $0.value > 0 }
+        }
+    }
 
     private static let longDayMonthYearFormatter: DateFormatter = {
         let df = DateFormatter()
@@ -65,9 +145,9 @@ struct TransactionsSheet: View {
                         .overlay(
                             VStack(spacing: 0) {
                                 if let selectedDate {
-                                    TooltipView(
+                                    ChartTooltip(
                                         date: selectedDate,
-                                        rows: seriesForDate(selectedDate),
+                                        rows: seriesForDate(selectedDate).map { ChartTooltipRow(color: $0.color, name: $0.name, value: $0.value) },
                                         formatValue: { value in
                                             formatAbbreviated(value, asCurrency: true)
                                         },
@@ -79,14 +159,36 @@ struct TransactionsSheet: View {
                                         }
                                     )
                                 }
-                                TransactionsChart(
-                                    selectedDate: $selectedDate,
-                                    selectedXPosition: $selectedXPosition,
-                                    data: viewModel.filteredDAppMetrics,
-                                    valueProvider: metricValue
-                                )
-                                .frame(height: 280)
-                                .padding(.bottom, 8)
+
+                                // Nur Chart anzeigen, wenn gültige Daten vorhanden sind
+                                if hasValidChartData {
+                                    TransactionsStackedChart(
+                                        selectedDate: $selectedDate,
+                                        selectedXPosition: $selectedXPosition,
+                                        series: stackedSeries.map { (date, parts) in
+                                            StackedSeriesBucket(date: date, parts: parts.map { StackedSeriesPart(name: $0.0, value: $0.1, color: $0.2) })
+                                        },
+                                        bucketer: bucketer,
+                                        currentBucket: currentBucket
+                                    )
+                                    .frame(height: 280)
+                                    .padding(.bottom, 8)
+                                } else {
+                                    // Placeholder für keine Daten
+                                    VStack(spacing: 12) {
+                                        Image(systemName: "chart.bar.xaxis")
+                                            .font(.system(size: 48))
+                                            .foregroundStyle(.secondary)
+                                        Text("No transaction data available")
+                                            .font(.headline)
+                                            .foregroundStyle(.secondary)
+                                        Text("Select a different time period")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    .frame(height: 280)
+                                    .frame(maxWidth: .infinity)
+                                }
                             }
                         )
                 }
@@ -175,129 +277,18 @@ struct TransactionsSheet: View {
         }
     }
 
-    private struct TooltipView: View {
-        let date: Date
-        let rows: [SeriesRow]
-        let formatValue: (Double) -> String
-        let formatDate: (Date) -> String
-        let formatTime: (Date) -> String
-        var body: some View {
-            VStack(spacing: 0) {
-                HStack {
-                    Text(formatDate(date))
-                        .font(.footnote.weight(.semibold))
-                    Spacer()
-                    Text(formatTime(date))
-                        .font(.footnote.weight(.semibold))
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
+    private func seriesForDate(_ date: Date) -> [ChartTooltipRow] {
+        // Finde den Bucket für das ausgewählte Datum
+        let bucketDate = bucketer.bucketStart(for: date, bucket: currentBucket)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(rows) { series in
-                        HStack(spacing: 10) {
-                            Circle()
-                                .fill(series.color)
-                                .frame(width: 6, height: 6)
-                            Text(series.name)
-                                .font(.footnote)
-                                .lineLimit(1)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(formatValue(series.value))
-                                .font(.footnote.weight(.semibold))
-                        }
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-            }
-        }
-    }
-
-    private struct TransactionsChart: View {
-        @Binding var selectedDate: Date?
-        @Binding var selectedXPosition: CGFloat?
-        let data: [DAppMetric]
-        let valueProvider: (DAppMetric) -> Double
-
-        var body: some View {
-            Chart(data) { item in
-                let y = valueProvider(item)
-                LineMark(
-                    x: .value("Date", item.date),
-                    y: .value("Value", y)
-                )
-                .interpolationMethod(.catmullRom)
-                .foregroundStyle(Color("GraphColor1", bundle: .main).opacity(1))
-
-                PointMark(
-                    x: .value("Date", item.date),
-                    y: .value("Value", y)
-                )
-                .opacity(selectedDate == item.date ? 1 : 0)
-                .symbolSize(40)
-                .foregroundStyle(Color("GraphColor1", bundle: .main))
-            }
-            .chartLegend(.hidden)
-            .chartYScale(domain: .automatic(includesZero: true))
-            .chartOverlay { proxy in
-                GeometryReader { geo in
-                    Rectangle()
-                        .fill(.clear)
-                        .contentShape(Rectangle())
-                        .gesture(
-                            DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                                .onChanged { value in
-                                    // Compute x relative to the plot area
-                                    let plotFrame = geo[proxy.plotAreaFrame]
-                                    let localX = value.location.x - plotFrame.origin.x
-                                    // Clamp within plot area bounds
-                                    let clampedX = max(0, min(localX, plotFrame.size.width))
-                                    selectedXPosition = clampedX
-                                    // Convert the absolute x in the view's coordinate space to a Date using the plot area's origin
-                                    let absoluteX = plotFrame.origin.x + clampedX
-                                    if let date: Date = proxy.value(atX: absoluteX, as: Date.self) {
-                                        selectedDate = date
-                                    }
-                                }
-                                .onEnded { _ in }
-                        )
-                        .overlay(alignment: .topLeading) {
-                            if let x = selectedXPosition {
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 1, height: proxy.plotAreaSize.height)
-                                    .offset(x: x)
-                            }
-                        }
-                }
-            }
-        }
-    }
-
-    private func metricValue(_ metric: DAppMetric) -> Double {
-        return metric.tradingVolume ?? 0
-    }
-
-    // Helper to map API-structured mock data for a given date into series rows
-    // Expects each metric item to provide `series: [Series]` where Series has `_id`, `name`, `value`, and an optional color.
-    // If color not provided, we derive a stable color from the name via .chartColors hash.
-    private func seriesForDate(_ date: Date) -> [SeriesRow] {
-        guard let item = viewModel.filteredDAppMetrics.first(where: { Calendar.current.isDate($0.date, inSameDayAs: date) }) else {
+        guard let bucket = stackedSeries.first(where: {
+            Calendar.current.isDate($0.date, inSameDayAs: bucketDate)
+        }) else {
             return []
         }
-        let val = metricValue(item)
-        return [SeriesRow(_id: "value", name: "Value", value: val, color: Color("GraphColor1", bundle: .main))]
-    }
 
-    // Lightweight row model used for the tooltip
-    private struct SeriesRow: Identifiable {
-        var id: String { _id }
-        let _id: String
-        let name: String
-        let value: Double
-        let color: Color
+        return bucket.parts.map { part in
+            ChartTooltipRow(color: part.color, name: part.name, value: part.value)
+        }
     }
 }
-
