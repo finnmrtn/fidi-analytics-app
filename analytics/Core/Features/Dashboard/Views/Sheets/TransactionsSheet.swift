@@ -14,6 +14,7 @@ struct TransactionsSheet: View {
     var viewModel: AnalyticsViewModel
     @Binding var showSheet: Bool
     var filterViewModel: TimeFilterViewModel
+    var selectionStore: SharedSelectionStore
 
     @State private var selectedDate: Date? = nil
     @State private var selectedXPosition: CGFloat? = nil
@@ -42,13 +43,13 @@ struct TransactionsSheet: View {
         }
         
         // Filter nur DApps mit tatsächlichen Werten > 0
-        let top10 = totals.filter { $0.total > 0 }
+        let top9 = totals.filter { $0.total > 0 }
             .sorted { $0.total > $1.total }
-            .prefix(10)
+            .prefix(9)
         
-        guard !top10.isEmpty else { return [] }
+        guard !top9.isEmpty else { return [] }
         
-        let topIds: [String] = top10.map { $0.id }
+        let topIds: [String] = top9.map { $0.id }
         
         // Bucket by the selected granularity for stacked bars
         let byBucket = Dictionary(grouping: metrics.filter { topIds.contains($0.dappId) }, by: { bucketer.bucketStart(for: $0.date, bucket: currentBucket) })
@@ -62,19 +63,24 @@ struct TransactionsSheet: View {
                 rows.reduce(0) { $0 + ($1.tradingFees ?? 0) }
             }
             
-            // Map to ordered parts with fixed colors
-            let parts: [(String, Double, Color)] = topIds.enumerated().compactMap { (idx, id) in
+            // Build Top 9 parts in rank order with fixed colors
+            let partsTop: [(String, Double, Color)] = topIds.enumerated().compactMap { (idx, id) in
                 let name = nameById[id] ?? "Project"
                 let value = perDapp[id] ?? 0
-                // Nur Parts mit Wert > 0 einschließen
                 guard value > 0 else { return nil }
                 let color = ChartTheme.transactionsColors[min(idx, ChartTheme.transactionsColors.count - 1)]
                 return (name, value, color)
             }
-            
-            // Nur Buckets mit mindestens einem Wert zurückgeben
-            guard !parts.isEmpty else { return nil }
-            return (key, parts)
+            // Compute Others for all non-top ids in this bucket
+            let othersValue = rows.reduce(0.0) { acc, row in
+                acc + (topIds.contains(row.dappId) ? 0.0 : (row.tradingFees ?? 0.0))
+            }
+            var partsWithOthers = partsTop
+            if othersValue > 0 {
+                partsWithOthers.append(("Others", othersValue, ChartTheme.transactionsColors.last ?? .gray))
+            }
+            guard !partsWithOthers.isEmpty else { return nil }
+            return (key, partsWithOthers)
         }
         
         return series
@@ -132,14 +138,19 @@ struct TransactionsSheet: View {
                 title: "Transactions",
                 metric: "Transactions",
                 metricValue: formatAbbreviated(viewModel.aggregatedTradingVolume, asCurrency: true),
+                filterViewModel: filterViewModel,
+                selectionStore: selectionStore,
+                filterButtonLabel: "Filter",
                 onClose: { showSheet = false },
                 onOpenFilter: { showFilterPopup = true },
-                icon: Image("txn")
+                icon: Image("txn"),
+                iconTint: AppTheme.Sheets.Transactions.iconTint,
+                iconStrokeColor: AppTheme.Sheets.Transactions.iconStroke,
+                backgroundColor: AppTheme.Sheets.Transactions.background
             ) {
                 ZStack(alignment: .top) {
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(Color(.secondarySystemBackground))
-                        .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 8)
+                        .fill(Color.white)
                         .overlay(
                             VStack(spacing: 0) {
                                 if let selectedDate {
@@ -183,14 +194,15 @@ struct TransactionsSheet: View {
                                             .font(.subheadline)
                                             .foregroundStyle(.tertiary)
                                     }
-                                    .frame(height: 280)
                                     .frame(maxWidth: .infinity)
+                                    .padding(.horizontal,16)
                                 }
                             }
                         )
                 }
             }
         }.padding(16)
+    
     }
 
     private struct HeaderView: View {
@@ -222,4 +234,3 @@ struct TransactionsSheet: View {
         }
     }
 }
-

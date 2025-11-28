@@ -10,6 +10,7 @@ struct CategoryDetailsContent: View {
             // Placeholder for future chart content
             CategoryDetailsTable(category: category, selectionStore: selectionStore, viewModel: viewModel)
         }
+        .padding(8)
     }
 }
 
@@ -18,10 +19,32 @@ struct CategoryDetailsTable: View {
     var selectionStore: SharedSelectionStore
     var viewModel: CategoriesViewModel
 
+    private func mapCategory(_ c: CategoryKind) -> LocalCategoryKindShim {
+        switch c {
+        case .dex: return .dex
+        case .nfts: return .nft
+        case .gaming: return .gaming
+        case .lending: return .lending
+        case .bridges: return .bridge
+        case .infrastructure: return .infrastructure
+        default: return .other
+        }
+    }
+    private func mapNetwork(_ n: Network) -> LocalNetworkShim {
+        switch n {
+        case .moonbeam: return .moonbeam
+        case .moonriver: return .moonriver
+        case .mantle: return .mantle
+        case .eigenlayer: return .eigenlayer
+        case .zksync: return .zksync
+        default: return .moonbeam
+        }
+    }
+
     var body: some View {
-        let rows: [TopProjectDisplay] = viewModel.rankedTopProjects(
-            for: category,
-            on: selectionStore.selectedNetwork,
+        let rows = viewModel.rankedTopProjects(
+            for: mapCategory(category),
+            on: mapNetwork(selectionStore.selectedNetwork),
             limit: 10
         )
 
@@ -31,25 +54,31 @@ struct CategoryDetailsTable: View {
                 HStack {
                     Text("#").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).frame(width: 24, alignment: .leading)
                     Text("Name").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
-                    Text("Transactions").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).frame(width: 110, alignment: .trailing)
+                    Text("TXNs").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).frame(width: 100, alignment: .trailing)
                     Text("UAW").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).frame(width: 80, alignment: .trailing)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
                 .background(Color(.secondarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+               
 
                 // Rows
                 VStack(spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.offset) { idx, row in
                         HStack {
                             Text("\(idx + 1)").font(.subheadline).foregroundStyle(.secondary).frame(width: 24, alignment: .leading)
-                            Text(row.name).font(.subheadline).frame(maxWidth: .infinity, alignment: .leading)
-                            Text(formatNumber(row.transactions)).font(.subheadline).frame(width: 110, alignment: .trailing)
+                            Text(row.name)
+                                .font(.subheadline)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .layoutPriority(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(formatNumber(row.transactions)).font(.subheadline).frame(width: 80, alignment: .trailing)
                             Text(formatNumber(row.uaw)).font(.subheadline).frame(width: 80, alignment: .trailing)
                         }
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 16)
 
                         if idx < rows.count - 1 { Divider().padding(.leading, 12) }
                     }
@@ -60,6 +89,7 @@ struct CategoryDetailsTable: View {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                 )
+                .padding(.top, 8)
             }
         }
     }

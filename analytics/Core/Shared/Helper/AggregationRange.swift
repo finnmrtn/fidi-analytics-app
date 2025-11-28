@@ -7,12 +7,11 @@
 
 import Foundation
 
-enum Aggregation: String, CaseIterable, Identifiable {
+enum Aggregation: String, CaseIterable, Codable, Identifiable {
     case sum = "Sum"
     case med = "Median"
     case avg = "Average"
     case max = "Max"
     case min = "Min"
     var id: String { self.rawValue }
-    
 }

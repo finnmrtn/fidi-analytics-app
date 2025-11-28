@@ -6,138 +6,16 @@
 //
 
 import SwiftUI
-import Charts
 
 protocol GasFeesDataProviding {
     var topDappsByGasFees: [(name: String, gasFees: Double)] { get }
-}
-
-private struct GasFeesChart: View {
-    let dapps: [(name: String, gasFees: Double)]
-    
-    private let palette: [Color] = [
-        Color("GraphColor2"),      // Blue
-        Color("GraphColor5"),      // Yellow
-        Color("GraphColor6"),      // Orange
-        Color("GraphColor7"),      // Red
-        Color("GraphColor4"),      // Pink
-        Color("GraphColor3"),      // Purple
-        Color("GraphColor1"),      // Green
-        Color("GraphColor8"),      // Coral
-        Color("GraphColor9"),      // Gray
-        Color("GraphColor10")
-    ]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(dapps.enumerated()), id: \.offset) { index, item in
-                let barColor = palette.indices.contains(index) ? palette[index] : palette[index % palette.count]
-                
-                HorizontalBarRow(
-                    name: item.name,
-                    value: item.gasFees,
-                    color: barColor,
-                    maxValue: dapps.map { $0.gasFees }.max() ?? 1
-                )
-            }
-        }
-    }
-}
-
-private struct HorizontalBarRow: View {
-    let name: String
-    let value: Double
-    let color: Color
-    let maxValue: Double
-    
-    private var barWidthRatio: CGFloat {
-        guard maxValue > 0 else { return 0 }
-        return CGFloat(value / maxValue)
-    }
-    
-    // Determine if bar is too small to show label inside
-    private var isSmallBar: Bool {
-        return barWidthRatio < 0.35
-    }
-    
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                // Gray background track
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.shade)
-                
-                    .frame(height: 48)
-                
-                // Colored bar section
-                HStack(spacing: 0) {
-                    // Bar with embedded label for larger bars
-                    HStack(spacing: 6) {
-                        // 3px color indicator
-                        Rectangle()
-                            .fill(.white)
-                            .frame(width: 3)
-                            .cornerRadius(4)
-                        
-                        if !isSmallBar {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(name)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                
-                                Text(value.formatted(.number.notation(.compactName).precision(.fractionLength(0))))
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, isSmallBar ? 0 : 8)
-                    .frame(width: geometry.size.width * barWidthRatio, alignment: .leading)
-                    .frame(height: 48)
-                    .background(color)
-                    .cornerRadius(16)
-                    
-                    // White label box for small bars
-                    if isSmallBar {
-                        HStack(spacing: 6) {
-                            Rectangle()
-                                .fill(Color(red: 0.94, green: 0.94, blue: 0.94))
-                                .frame(width: 3)
-                                .cornerRadius(4)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(name)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(Color(red: 0.41, green: 0.41, blue: 0.41))
-                                    .lineLimit(1)
-                                
-                                Text(value.formatted(.number.notation(.compactName).precision(.fractionLength(0))))
-                                    .font(.system(size: 14))
-                                    .foregroundColor(Color.backing)
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(.white)
-                        .cornerRadius(8)
-                        .padding(.leading, 10)
-                    }
-                    
-                    Spacer(minLength: 0)
-                }
-            }
-        }
-        .frame(height: 48)
-        .cornerRadius(4)
-    }
 }
 
 struct GasFeesSheet: View {
     var viewModel: AnalyticsViewModel
     @Binding var showSheet: Bool
     var filterViewModel: TimeFilterViewModel
+    var selectionStore: SharedSelectionStore
 
     @State private var showFilterPopup: Bool = false
 
@@ -150,30 +28,45 @@ struct GasFeesSheet: View {
                 return Array(sorted.prefix(10))
             }
         }
-        // Fallback to MockData
+        // Fallback to MockData, also cleaned and sorted for consistency
         let mockData = mockTop10FeesWithNames()
-        return mockData.map { (name: $0.name, gasFees: $0.tradingFees) }
+        return mockData
+            .map { (name: $0.name, gasFees: $0.tradingFees) }
+            .filter { $0.gasFees.isFinite && $0.gasFees >= 0 }
+            .sorted { $0.gasFees > $1.gasFees }
+            .prefix(10)
+            .map { $0 }
+    }
+
+    private var totalGasFeesFormatted: String {
+        let total = topDappsByGasFees.map { $0.gasFees }.reduce(0, +)
+        return total.formatted(.number.notation(.compactName).precision(.fractionLength(0)))
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                let rawDapps = topDappsByGasFees
-                let dapps = rawDapps.filter { $0.gasFees.isFinite && $0.gasFees >= 0 }
+                let dapps = topDappsByGasFees
                 
                 MetricSheetTemplate(
                     title: "Gas Fees",
                     metric: "Gas Fees",
-                    metricValue: (dapps.map { $0.gasFees }.reduce(0, +)).formatted(.number.notation(.compactName).precision(.fractionLength(0))),
+                    metricValue: totalGasFeesFormatted,
+                    filterViewModel: filterViewModel,
+                    selectionStore: selectionStore,
+                    filterButtonLabel: "Filter",
                     onClose: { showSheet = false },
                     onOpenFilter: { showFilterPopup = true },
-                    icon: Image("gasfee")
+                    icon: Image("gasfee"),
+                    iconTint: AppTheme.Sheets.GasFees.iconTint,
+                    iconStrokeColor: AppTheme.Sheets.GasFees.iconStroke,
+                    backgroundColor: AppTheme.Sheets.GasFees.background
                 ) {
                     RoundedRectangle(cornerRadius: 24)
-                        .fill(Color.backing)
+                        .fill(AppTheme.Analytics.backing)
                         .overlay(
                             RoundedRectangle(cornerRadius: 24)
-                                .stroke(Color.shade, lineWidth: 1)
+                                .stroke(AppTheme.Analytics.shade, lineWidth: 1)
                         )
                         .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
                         .overlay(
@@ -191,7 +84,7 @@ struct GasFeesSheet: View {
                                     .padding(16)
                                 } else {
                                     ScrollView {
-                                        GasFeesChart(dapps: dapps)
+                                        RankedChart(dapps: dapps)
                                             .padding(8)
                                     }
                                 }
@@ -203,7 +96,7 @@ struct GasFeesSheet: View {
                 Spacer()
             }
             .navigationBarHidden(true)
-        }
+        }.padding(16)
         
     }
 }
@@ -219,7 +112,7 @@ struct GasFeesSheet: View {
             .fill(Color(uiColor: .secondarySystemBackground))
             .overlay(
                 ScrollView {
-                    GasFeesChart(dapps: dapps)
+                    RankedChart(dapps: dapps)
                         .padding(16)
                 }
             )
@@ -238,7 +131,7 @@ struct GasFeesSheet: View {
             .fill(Color(uiColor: .secondarySystemBackground))
             .overlay(
                 ScrollView {
-                    GasFeesChart(dapps: dapps)
+                    RankedChart(dapps: dapps)
                         .padding(16)
                 }
             )
@@ -281,3 +174,27 @@ struct GasFeesSheet: View {
     .preferredColorScheme(.light)
 }
 
+
+#if DEBUG
+private struct MockFeeItem {
+    let name: String
+    let tradingFees: Double
+}
+
+/// Provides deterministic mock data for previews and fallback paths.
+/// Matches the tuple usage `(name: String, tradingFees: Double)` expected by the callers.
+private func mockTop10FeesWithNames() -> [MockFeeItem] {
+    return [
+        MockFeeItem(name: "Project Alpha", tradingFees: 3_343_000),
+        MockFeeItem(name: "Project Beta", tradingFees: 1_840_000),
+        MockFeeItem(name: "Project Gamma", tradingFees: 450_000),
+        MockFeeItem(name: "Delta Swap", tradingFees: 390_000),
+        MockFeeItem(name: "Omega Bridge", tradingFees: 320_500),
+        MockFeeItem(name: "Zeta Finance", tradingFees: 210_300),
+        MockFeeItem(name: "Theta Labs", tradingFees: 180_000),
+        MockFeeItem(name: "Sigma Dex", tradingFees: 150_000),
+        MockFeeItem(name: "Lambda Pay", tradingFees: 120_000),
+        MockFeeItem(name: "Kappa Vault", tradingFees: 95_000),
+    ]
+}
+#endif

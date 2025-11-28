@@ -1,62 +1,42 @@
 import SwiftUI
 
 struct SearchView: View {
-    @State private var searchText: String = ""
+    @StateObject private var viewModel = SearchViewModel()
     @FocusState private var isFocused: Bool
-    @State private var selectedStellaSwap: Bool = false
-    @State private var selectedBeamSwap: Bool = false
-    
-    private let allProjects = [
-        "StellaSwap Alpha",
-        "Beam Swap Beta",
-        "StellaSwap Gamma",
-        "Beam Swap Delta",
-        "Alpha Project",
-        "Beam Swap Epsilon",
-        "StellaSwap Zeta",
-        "Other Project"
-    ]
-    
-    private var filteredProjects: [String] {
-        allProjects.filter { project in
-            // Filter by search text
-            let matchesSearch = searchText.isEmpty || project.localizedCaseInsensitiveContains(searchText)
-            // Filter by selected chips
-            let matchesStella = !selectedStellaSwap || project.localizedCaseInsensitiveContains("StellaSwap")
-            let matchesBeam = !selectedBeamSwap || project.localizedCaseInsensitiveContains("Beam Swap")
-            return matchesSearch && matchesStella && matchesBeam
-        }
-    }
+    var selectionStore: SharedSelectionStore
+
+    @State private var showProjectSelector: Bool = false
     
     var body: some View {
-        ZStack {
-            // Background blur and dim
-            Color.black.opacity(0.3)
+        ZStack(alignment: .top) {
+            // Background behind everything
+            Color.clear
+                .background(.regularMaterial)
                 .ignoresSafeArea()
-                .background(.ultraThinMaterial)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 16) {
-                // Chips
-                HStack(spacing: 12) {
-                    FilterChip(title: "StellaSwap", isSelected: $selectedStellaSwap)
-                    FilterChip(title: "Beam Swap", isSelected: $selectedBeamSwap)
-                    Spacer()
-                }
-                .padding(.horizontal)
-                
+
+            VStack(spacing: 6) {
+                TopNavigation(
+                    selectedNetwork: Binding(
+                        get: { selectionStore.selectedNetwork },
+                        set: { selectionStore.selectedNetwork = $0 }
+                    ),
+                    showProjectSelector: $showProjectSelector,
+                    showsTimeFilter: false
+                )
+                .padding(.horizontal, 16)
+
                 // Search field
                 HStack {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
-                    TextField("Search for projects", text: $searchText)
+                    TextField("Search for projects", text: $viewModel.searchText)
                         .focused($isFocused)
                         .submitLabel(.search)
                         .autocorrectionDisabled(true)
                         .textInputAutocapitalization(.never)
-                    if !searchText.isEmpty {
+                    if !viewModel.searchText.isEmpty {
                         Button {
-                            searchText = ""
+                            viewModel.searchText = ""
                             hideKeyboard()
                         } label: {
                             Image(systemName: "xmark.circle.fill")
@@ -65,35 +45,127 @@ struct SearchView: View {
                         .accessibilityLabel("Clear search text")
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(Color(.systemBackground))
                         .shadow(color: Color.black.opacity(0.1), radius: 1, x: 0, y: 1)
                 )
-                .padding(.horizontal)
-                
-                // Results list
+                .padding(.horizontal, 16)
+
                 List {
-                    if filteredProjects.isEmpty {
-                        Text("No results")
-                            .foregroundColor(.secondary)
+                    if viewModel.searchText.isEmpty {
+                        if !viewModel.recommendations.isEmpty {
+                            Section("Recommendations") {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ForEach(viewModel.recommendations.prefix(4), id: \.self) { name in
+                                        HStack {
+                                            Button(action: { viewModel.selectSuggestion(name) }) {
+                                                Text(name)
+                                                    .font(.subheadline.weight(.semibold))
+                                                    .foregroundStyle(.primary)
+                                                    .lineLimit(1)
+                                                    .padding(.horizontal,14)
+                                                    .padding(.vertical,8)
+                                                    .background(
+                                                        Capsule(style: .continuous)
+                                                            .fill(.thinMaterial)
+                                                    )
+                                                    .overlay(
+                                                        Capsule(style: .continuous)
+                                                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                                                    )
+                                            }
+                                            .buttonStyle(.plain)
+                                            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+                                            Spacer(minLength: 8)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 8)
+                            }
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                        }
+                        if !viewModel.recentSearches.isEmpty {
+                            Section("Recent") {
+                                ForEach(viewModel.recentSearches, id: \.self) { name in
+                                    Button(name) { viewModel.selectSuggestion(name) }
+                                }
+                            }
+                            .listRowBackground(Color.clear)
+                        }
                     } else {
-                        ForEach(filteredProjects, id: \.self) { project in
-                            Text(project)
+                        if !viewModel.suggestions.isEmpty {
+                            Section("Suggestions") {
+                                ForEach(viewModel.suggestions, id: \.self) { name in
+                                    Button(name) { viewModel.selectSuggestion(name) }
+                                }
+                            }
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+
+                    if !viewModel.searchText.isEmpty {
+                        if viewModel.filteredProjects.isEmpty {
+                            Text("No results")
+                                .foregroundColor(.secondary)
+                                .listRowBackground(Color.clear)
+                        } else {
+                            Section("Results") {
+                                ForEach(viewModel.filteredProjects, id: \.self) { project in
+                                    Button(project) {
+                                        viewModel.addToRecents(project)
+                                    }
+                                    .listRowBackground(Color.clear)
+                                }
+                            }
+                            .listRowBackground(Color.clear)
                         }
                     }
                 }
                 .listStyle(.plain)
+                .listSectionSpacing(6)
             }
-            .padding(.bottom,  safeAreaKeyboardPadding())
             .padding(.top, 16)
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    isFocused = true
-                }
+            .padding(.bottom, safeAreaKeyboardPadding())
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isFocused = true
             }
+        }
+        .sheet(isPresented: $showProjectSelector) {
+            NavigationStack {
+                List {
+                    Section("Networks") {
+                        ForEach(Network.allCases, id: \.self) { network in
+                            Button {
+                                selectionStore.selectedNetwork = network
+                                showProjectSelector = false
+                            } label: {
+                                HStack {
+                                    Text(network.rawValue.capitalized)
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                    if network == selectionStore.selectedNetwork {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.accentColor)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .navigationTitle("Select Network")
+                .toolbarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { showProjectSelector = false } label: { Image(systemName: "xmark") } } }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
         }
     }
     
@@ -102,32 +174,6 @@ struct SearchView: View {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = scene.windows.first else { return 0 }
         return window.safeAreaInsets.bottom
-    }
-}
-
-private struct FilterChip: View {
-    let title: String
-    @Binding var isSelected: Bool
-    
-    var body: some View {
-        Button {
-            isSelected.toggle()
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                    .foregroundColor(isSelected ? .accentColor : .secondary)
-                Text(title)
-                    .foregroundColor(.primary)
-                    .font(.subheadline.weight(.medium))
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(
-                Capsule()
-                    .fill(Color(.systemBackground).opacity(isSelected ? 0.3 : 0.15))
-            )
-        }
-        .buttonStyle(.plain)
     }
 }
 

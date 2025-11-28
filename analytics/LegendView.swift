@@ -39,8 +39,19 @@ public struct ChartLegendView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.systemBackground))
+                .fill(
+                    {
+                        #if canImport(UIKit)
+                        return Color(uiColor: .systemBackground)
+                        #elseif canImport(AppKit)
+                        return Color(nsColor: .windowBackgroundColor)
+                        #else
+                        return Color.white
+                        #endif
+                    }()
+                )
                 .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 8)
         )
     }
 }
+

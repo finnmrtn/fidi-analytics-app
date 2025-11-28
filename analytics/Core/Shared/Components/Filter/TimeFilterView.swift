@@ -82,7 +82,7 @@ struct TimeFilterView: View {
                                                     .fill(Color.clear)
                                                     .overlay(
                                                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                                            .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                                                            .stroke(Color.highlight, lineWidth: 1)
                                                     )
                                             }
                                         }
@@ -95,9 +95,7 @@ struct TimeFilterView: View {
 
                     // Date range picker
                     VStack(spacing: 12) {
-                        Text("Select Date Range")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        Spacer().frame(height: 16)
 
                         HStack(spacing: 10) {
                             // Liquid Glass styled button whose text reflects current selection or preset
@@ -128,27 +126,26 @@ struct TimeFilterView: View {
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                                        .stroke(Color.highlight, lineWidth: 1)
                                 )
+                                .overlay(alignment: .trailing) {
+                                    if chartStartDate != nil || chartEndDate != nil {
+                                        Button {
+                                            chartStartDate = nil
+                                            chartEndDate = nil
+                                            viewModel.setScale(viewModel.selectedScale)
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .imageScale(.medium)
+                                                .foregroundStyle(.secondary)
+                                                .padding(.trailing, 10)
+                                        }
+                                        .accessibilityLabel("Clear custom date range")
+                                    }
+                                }
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Choose date range")
-
-                            Spacer()
-
-                            if chartStartDate != nil || chartEndDate != nil {
-                                Button {
-                                    chartStartDate = nil
-                                    chartEndDate = nil
-                                    // Reset to the current preset scale values so UI shows the preselect instead of nil
-                                    viewModel.setScale(viewModel.selectedScale)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .imageScale(.medium)
-                                        .foregroundStyle(.secondary)
-                                        .accessibilityLabel("Clear custom date range")
-                                }
-                            }
                         }
 
                         // Removed descriptive line under the button as per instructions
@@ -168,19 +165,19 @@ struct TimeFilterView: View {
                         ]
                         ForEach(quarters, id: \.label) { item in
                             Button(item.label) {
-                                // Treat as preset: set scale and compute internal dates, but keep external selection nil
                                 viewModel.setScale(item.scale)
-                                chartStartDate = nil
-                                chartEndDate = nil
+                                chartStartDate = viewModel.startDate
+                                chartEndDate = viewModel.endDate
                             }
                             .padding(.vertical, 8)
                             .padding(.horizontal, 12)
+                            .frame(maxWidth: .infinity)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .fill(viewModel.selectedScale == item.scale ? Color("BrandColor").opacity(0.12) : Color.clear)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                                            .stroke(Color.highlight, lineWidth: 1)
                                     )
                             )
                             .foregroundStyle(viewModel.selectedScale == item.scale ? Color("BrandColor") : .primary)
@@ -190,6 +187,14 @@ struct TimeFilterView: View {
                 }
                 .padding(.top, 4)
                 .padding(.bottom, 8)
+            }
+        }
+        .onAppear {
+            // If no custom range is set yet, apply the preselected scale from the view model
+            if chartStartDate == nil && chartEndDate == nil {
+                viewModel.setScale(viewModel.selectedScale)
+                chartStartDate = viewModel.startDate
+                chartEndDate = viewModel.endDate
             }
         }
         .fullScreenCover(isPresented: $showingRangePicker) {
@@ -206,6 +211,7 @@ struct TimeFilterView: View {
 
                 // Edge-to-edge content container
                 VStack(spacing: 0) {
+                    Spacer().frame(height: 8)
                     // Custom top bar
                     HStack {
                         Button("Abbrechen") {

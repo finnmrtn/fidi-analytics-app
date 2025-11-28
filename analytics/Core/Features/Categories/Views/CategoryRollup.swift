@@ -1,51 +1,21 @@
 import Foundation
 
-/// Represents an aggregated rollup of analytics for a given category.
-/// This is a minimal model to satisfy repository and mock usages.
-public struct CategoryRollup: Hashable, Codable, Sendable {
-    /// The category identifier.
-    public let category: CategoryKind
-    /// Total value for the selected window (e.g., UAW, transactions, etc.).
-    public let total: Double
-    /// Optional per-network breakdown for the category.
-    public let perNetwork: [NetworkBreakdown]
+/// Aggregated rollup of analytics for a given category.
+/// Uses shared `CategoryKind` and `Network` types defined elsewhere in the project.
+public struct CategoryRollup: Codable, Hashable, Sendable {
+    public let kind: CategoryKind
+    public let id: String
+    public let name: String
+    public let totalUAW: Double
+    public let totalTransactions: Double
+    public let projectCount: Int
 
-    public init(category: CategoryKind, total: Double, perNetwork: [NetworkBreakdown] = []) {
-        self.category = category
-        self.total = total
-        self.perNetwork = perNetwork
+    public init(kind: CategoryKind, id: String, name: String, totalUAW: Double, totalTransactions: Double, projectCount: Int) {
+        self.kind = kind
+        self.id = id
+        self.name = name
+        self.totalUAW = totalUAW
+        self.totalTransactions = totalTransactions
+        self.projectCount = projectCount
     }
-}
-
-/// A lightweight representation of a network-specific value for a category.
-public struct NetworkBreakdown: Hashable, Codable, Sendable {
-    public let network: Network
-    public let value: Double
-
-    public init(network: Network, value: Double) {
-        self.network = network
-        self.value = value
-    }
-}
-
-/// A minimal enum describing high-level DApp categories.
-/// If your project already defines `CategoryKind` elsewhere, remove this and use that definition instead.
-public enum CategoryKind: String, CaseIterable, Codable, Sendable {
-    case defi
-    case nft
-    case gaming
-    case dax
-    case social
-    case other
-}
-
-/// A minimal network enum placeholder.
-/// If your project already defines `Network` elsewhere, remove this and use that definition instead.
-public enum Network: String, CaseIterable, Codable, Sendable {
-    case ethereum
-    case polygon
-    case solana
-    case arbitrum
-    case optimism
-    case base
 }

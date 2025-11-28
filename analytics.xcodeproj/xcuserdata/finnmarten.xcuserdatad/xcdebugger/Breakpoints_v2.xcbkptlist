@@ -3,4 +3,52 @@
    uuid = "AB13C3B3-D220-4663-B407-6B78D27FCF8C"
    type = "1"
    version = "2.0">
+   <Breakpoints>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "3314931F-369B-4120-9BE5-BFA5445EF513"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "analytics/Core/Shared/Components/Style/AppTheme.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "128"
+            endingLineNumber = "128"
+            landmarkName = "Sheets"
+            landmarkType = "13">
+            <Locations>
+               <Location
+                  uuid = "3314931F-369B-4120-9BE5-BFA5445EF513 - a6e308d89ea7941c"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "one-time initialization function for iconTint"
+                  moduleName = "analytics.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/finnmarten/Documents/GitHub/fidi-analytics-app/analytics/Core/Shared/Components/Style/AppTheme.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "129"
+                  endingLineNumber = "129">
+               </Location>
+               <Location
+                  uuid = "3314931F-369B-4120-9BE5-BFA5445EF513 - cff8b1003891388a"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "analytics.AppTheme.Sheets.Standard.iconTint.unsafeMutableAddressor : SwiftUI.Color"
+                  moduleName = "analytics.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/finnmarten/Documents/GitHub/fidi-analytics-app/analytics/Core/Shared/Components/Style/AppTheme.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "129"
+                  endingLineNumber = "129">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+   </Breakpoints>
 </Bucket>

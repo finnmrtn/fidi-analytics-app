@@ -3,16 +3,23 @@ import SwiftUI
 
 @Observable
 final class AnalyticsViewModel {
+    private let repo: AnalyticsRepository
+
     // Inputs
     var selectedAggregation: Aggregation = .sum
     
     var filterStartDate: Date?
     var filterEndDate: Date?
     
-    private(set) var dappMetrics: [DAppMetric] = mockDAppMetrics()
-
+    private(set) var dappMetrics: [DAppMetric] = []
+    
     // Data
-    private(set) var allData: [ViewMonthCategory] = mockViewMonthCategories()
+    private(set) var allData: [ViewMonthCategory] = []
+
+    init(repo: AnalyticsRepository = MockAnalyticsRepository()) {
+        self.repo = repo
+        Task { await self.loadInitialData() }
+    }
 
     // Computed properties
     var filteredData: [ViewMonthCategory] {
@@ -23,10 +30,43 @@ final class AnalyticsViewModel {
     }
     
     var filteredDAppMetrics: [DAppMetric] {
+        // Step 1: Apply date range filter
+        let base: [DAppMetric]
         if let start = filterStartDate, let end = filterEndDate {
-            return dappMetrics.filter { $0.date >= start && $0.date <= end }
+            base = dappMetrics.filter { $0.date >= start && $0.date <= end }
+        } else {
+            base = dappMetrics
         }
-        return dappMetrics
+        guard !base.isEmpty else { return [] }
+
+        // Step 2: Downsample to daily frequency PER DAPP (preserve dappId for Top-9 + Other logic)
+        let cal = Calendar.current
+        // Group by (dappId, startOfDay)
+        let grouped: [String: [Date: [DAppMetric]]] = Dictionary(grouping: base, by: { $0.dappId })
+            .mapValues { rows in
+                Dictionary(grouping: rows, by: { cal.startOfDay(for: $0.date) })
+            }
+
+        // Merge each (dappId, day) group into a single daily row for that dapp
+        var daily: [DAppMetric] = []
+        for (dappId, byDay) in grouped {
+            for day in byDay.keys.sorted() {
+                let rows = byDay[day] ?? []
+                let totalTradingVolume = rows.reduce(0.0) { $0 + ($1.tradingVolume ?? 0) }
+                let totalTradingFees = rows.reduce(0.0) { $0 + ($1.tradingFees ?? 0) }
+                let totalDAU = rows.reduce(0.0) { $0 + ($1.dau ?? 0) }
+                daily.append(
+                    DAppMetric(
+                        date: day,
+                        dappId: dappId,
+                        tradingVolume: totalTradingVolume,
+                        tradingFees: totalTradingFees,
+                        dau: totalDAU
+                    )
+                )
+            }
+        }
+        return daily.sorted { $0.date < $1.date }
     }
 
     // Aggregated metric depending on user selection
@@ -167,6 +207,16 @@ final class AnalyticsViewModel {
     // Aggregate for the sheet header (sum over the Top-10 fees)
     var aggregatedTop10TradingFees: Double {
         top10FeesRows.reduce(0) { $0 + $1.tradingFees }
+    }
+    
+    @MainActor
+    func loadInitialData() async {
+        do {
+            self.dappMetrics = try await repo.fetchDAppMetricsDaily(lastDays: 365 * 5)
+            self.allData = try await repo.fetchViewMonthCategories()
+        } catch {
+            // Keep empty on error for now; you may add logging here.
+        }
     }
 }
 

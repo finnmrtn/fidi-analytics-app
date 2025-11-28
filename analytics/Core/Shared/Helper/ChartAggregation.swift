@@ -1,11 +1,5 @@
 import Foundation
 
-struct StackedBarChartPoint {
-    let date: Date
-    let name: String
-    let value: Double
-}
-
 enum ChartAggregation {
     private static let bucketer = TimeBucketer()
 
@@ -59,7 +53,7 @@ enum ChartAggregation {
             // Add Top-9 (only those with value > 0 in this bucket), in stable order
             for project in orderedTop9 {
                 if let v = perProject[project], v > 0 {
-                    bucketPoints.append(StackedBarChartPoint(date: b, name: project, value: v))
+                    bucketPoints.append(StackedBarChartPoint(date: b, value: v, category: project))
                 }
             }
 
@@ -71,7 +65,7 @@ enum ChartAggregation {
             // Always include exactly one Other segment per bucket (even if 0),
             // to keep a consistent 10-segment structure visually where possible.
             // If you prefer to hide zero, set the condition to (otherSum > 0).
-            bucketPoints.append(StackedBarChartPoint(date: b, name: "Other", value: otherSum))
+            bucketPoints.append(StackedBarChartPoint(date: b, value: otherSum, category: "Other"))
 
             // Ensure at most 10 segments (Top up to 9 + Other)
             // If fewer than 9 Top projects have data in this bucket, we still keep Other as the 10th.

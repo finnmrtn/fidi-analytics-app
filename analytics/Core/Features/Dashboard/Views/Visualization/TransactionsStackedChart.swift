@@ -86,7 +86,7 @@ struct TransactionsStackedChart: View {
         let sortedSeries = series.sorted { $0.date < $1.date }
 
         // Calculate step width between points
-        let minX: CGFloat = 0
+        let _: CGFloat = 0
         let maxX: CGFloat = width
         let count = sortedSeries.count
 
@@ -100,59 +100,5 @@ struct TransactionsStackedChart: View {
         let clampedIndex = max(0, min(count - 1, index))
 
         return sortedSeries[clampedIndex].date
-    }
-}
-
-struct TransactionsStackedChart_Previews: PreviewProvider {
-    static var previews: some View {
-        let parts1 = [
-            StackedSeriesPart(name: "Food", value: 20, color: .red),
-            StackedSeriesPart(name: "Transport", value: 10, color: .blue),
-            StackedSeriesPart(name: "Other", value: 5, color: .green)
-        ]
-        let parts2 = [
-            StackedSeriesPart(name: "Food", value: 15, color: .red),
-            StackedSeriesPart(name: "Transport", value: 12, color: .blue),
-            StackedSeriesPart(name: "Other", value: 7, color: .green)
-        ]
-        let parts3 = [
-            StackedSeriesPart(name: "Food", value: 25, color: .red),
-            StackedSeriesPart(name: "Transport", value: 8, color: .blue),
-            StackedSeriesPart(name: "Other", value: 12, color: .green)
-        ]
-
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let series = [
-            StackedSeriesPoint(date: calendar.date(byAdding: .day, value: -2, to: today)!, parts: parts1),
-            StackedSeriesPoint(date: calendar.date(byAdding: .day, value: -1, to: today)!, parts: parts2),
-            StackedSeriesPoint(date: today, parts: parts3)
-        ]
-
-        return VStack(spacing: 24) {
-            // Stacked Bars (for Transaction Fees)
-            TransactionsStackedChart(
-                selectedDate: .constant(nil),
-                selectedXPosition: .constant(nil),
-                series: series,
-                bucketer: TimeBucketer(),
-                currentBucket: .day,
-                style: .stackedBars
-            )
-            .frame(height: 220)
-            .padding()
-
-            // Stacked Area (for Transaction Sheet)
-            TransactionsStackedChart(
-                selectedDate: .constant(nil),
-                selectedXPosition: .constant(nil),
-                series: series,
-                bucketer: TimeBucketer(),
-                currentBucket: .day,
-                style: .stackedArea
-            )
-            .frame(height: 220)
-            .padding()
-        }
     }
 }

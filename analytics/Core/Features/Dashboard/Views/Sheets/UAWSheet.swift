@@ -8,130 +8,79 @@
 import SwiftUI
 import Charts
 
-struct UAWPoint: Identifiable {
-    let id: UUID
-    let date: Date
-    let value: Double
-    let project: String
-}
-
 struct UAWSheet: View {
     var viewModel: AnalyticsViewModel
     @Binding var showSheet: Bool
     var filterViewModel: TimeFilterViewModel
+    var selectionStore: SharedSelectionStore
 
     @State private var showFilterPopup: Bool = false
 
-    var body: some View {
+    private var preparedChart: (data: [StackedBarChartPoint], colorDomain: [String]) {
         // Use real directory names for projects via dappId lookup
         let nameMap = nameByDappId()
 
-        // Map metrics -> (date, value, projectName)
-        let points = viewModel.filteredDAppMetrics.map { metric -> (date: Date, value: Double, project: String) in
-            let name = nameMap[metric.dappId] ?? "Project"
-            return (date: metric.date, value: Double(metric.dau ?? 0), project: name)
-        }
+        let cal = Calendar.current
+        let now = Date()
 
-        // Compute total UAW per project across the filtered range to find top 9
-        let totalsByProject: [String: Double] = points.reduce(into: [:]) { dict, item in
-            dict[item.project, default: 0] += item.value
-        }
-        // Preserve ranking order for color assignment (descending by total)
-        let rankedTop: [String] = totalsByProject.sorted { $0.value > $1.value }.prefix(9).map { $0.key }
-        let rankedCategories: [String] = rankedTop + ["Other"]
-
-        // Define palette per requested ranking mapping
-        // #1 -> GraphColor2
-        // #2 -> GraphColor6
-        // #3 -> GraphColor5
-        // #4 -> GraphColor7
-        // #5 -> GraphColor4
-        // #6 -> GraphColor3
-        // #7 -> GraphColor1
-        // #8 -> GraphColor8
-        // #9 -> GraphColor9
-        // #10 Other -> GraphColor10
-        let palette: [Color] = [
-            Color("GraphColor2"),
-            Color("GraphColor6"),
-            Color("GraphColor5"),
-            Color("GraphColor7"),
-            Color("GraphColor4"),
-            Color("GraphColor3"),
-            Color("GraphColor1"),
-            Color("GraphColor8"),
-            Color("GraphColor9"),
-            Color("GraphColor10")
-        ]
-
-        // Build domain and range arrays for Charts (ordered mapping)
-        let colorDomain: [String] = rankedTop + ["Other"]
-        let colorRange: [Color] = [
-            Color("GraphColor2"),
-            Color("GraphColor6"),
-            Color("GraphColor5"),
-            Color("GraphColor7"),
-            Color("GraphColor4"),
-            Color("GraphColor3"),
-            Color("GraphColor1"),
-            Color("GraphColor8"),
-            Color("GraphColor9"),
-            Color("GraphColor10")
-        ]
-
-        // Collapse non-top projects into "Other" and pre-aggregate by (date, project)
-        let aggregatedByDateAndProject: [Date: [String: Double]] = points.reduce(into: [:]) { result, item in
-            let category = rankedTop.contains(item.project) ? item.project : "Other"
-            var inner = result[item.date] ?? [:]
-            inner[category, default: 0] += item.value
-            result[item.date] = inner
-        }
-
-        // Flatten back into UAWPoint rows for the chart
-        let data: [UAWPoint] = aggregatedByDateAndProject.flatMap { (date, buckets) in
-            buckets.map { (project, total) in
-                UAWPoint(id: UUID(), date: date, value: total, project: project)
+        // Decide bucketing based on the filter timeframe if available via selectionStore/filterViewModel
+        // If not directly available, default to monthly buckets over the last 12 months.
+        // Here we implement a simple monthly bucketing for the last 12 months to ensure multiple bars.
+        let monthsBack = 24
+        var bucketAnchors: [Date] = []
+        if let startOfThisMonth = cal.date(from: cal.dateComponents([.year, .month], from: now)) {
+            for i in stride(from: monthsBack - 1, through: 0, by: -1) {
+                if let d = cal.date(byAdding: .month, value: -i, to: startOfThisMonth) {
+                    bucketAnchors.append(d)
+                }
             }
-        }.sorted { lhs, rhs in
-            if lhs.date == rhs.date { return lhs.project < rhs.project }
-            return lhs.date < rhs.date
         }
-        
+
+        // Build raw points per bucket: sum dau by project within each month
+        var rawPoints: [(date: Date, value: Double, project: String)] = []
+        for anchor in bucketAnchors {
+            // month range: [anchor, nextMonth)
+            let nextMonth = cal.date(byAdding: .month, value: 1, to: anchor) ?? anchor
+            var sumByProject: [String: Double] = [:]
+            for m in viewModel.filteredDAppMetrics where m.date >= anchor && m.date < nextMonth {
+                let name = nameMap[m.dappId] ?? "Project"
+                let v = m.dau ?? 0
+                guard v != 0 else { continue }
+                sumByProject[name, default: 0] += v
+            }
+            if !sumByProject.isEmpty {
+                for (name, val) in sumByProject { rawPoints.append((date: anchor, value: val, project: name)) }
+            }
+        }
+
+        // Aggregate into Top N + Other while preserving color domain across all buckets
+        let aggregated = ChartAggregation.aggregateTopNWithOther(from: rawPoints, topCount: 9, bucket: .month, calendar: cal)
+        return (aggregated.data, aggregated.colorDomain)
+    }
+
+    var body: some View {
+        let (data, colorDomain) = preparedChart
+
         MetricSheetTemplate(
             title: "Unique Active Wallets",
             metric: "Unique Active Wallets",
             metricValue: viewModel.aggregatedUAW.formatted(),
+            filterViewModel: filterViewModel,
+            selectionStore: selectionStore,
+            filterButtonLabel: "Filter",
             onClose: { showSheet = false },
             onOpenFilter: { showFilterPopup = true },
-            icon: Image("uaw")
+            icon: Image("uaw"),
+            iconTint: AppTheme.Sheets.UAW.iconTint,
+            iconStrokeColor: AppTheme.Sheets.UAW.iconStroke,
+            backgroundColor: AppTheme.Sheets.UAW.background
         ) {
-            GeometryReader { proxy in
-                let availableHeight = max(proxy.size.height, 220)
-                Chart(data) { point in
-                    BarMark(
-                        x: .value("Date", point.date, unit: .month),
-                        y: .value("UAW", point.value)
-                    )
-                    .foregroundStyle(by: .value("Project", point.project))
-                }
-                .chartLegend(.visible)
-                .chartForegroundStyleScale(domain: colorDomain, range: colorRange)
-                .chartXAxis {
-                    AxisMarks(values: .stride(by: .month)) {
-                        AxisValueLabel(format: .dateTime.month(.abbreviated))
-                        AxisGridLine()
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks {
-                        AxisValueLabel()
-                        AxisGridLine()
-                    }
-                }
-                .frame(height: availableHeight)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            }
-            .frame(minHeight: 280)
+            StackedBarChartView(
+                data: data,
+                colorDomain: colorDomain,
+                yLabel: "UAW",
+                minHeight: 280
+            )
             .layoutPriority(1)
         }
         .padding(16)
@@ -150,3 +99,4 @@ private extension Array where Element: Hashable {
         return result
     }
 }
+

@@ -1,6 +1,17 @@
 import SwiftUI
 import Charts
 
+private extension View {
+    @ViewBuilder
+    func applyIf<T>(_ condition: Bool, transform: (Self) -> T) -> some View where T: View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
+}
+
 struct PriceLineChartView: View {
     struct PricePoint: Identifiable {
         let id = UUID()
@@ -13,219 +24,148 @@ struct PriceLineChartView: View {
     let endDate: Date?
 
     @State private var selectedDate: Date? = nil
-    @State private var selectedPoint: PricePoint? = nil
 
-    private let bucketer = TimeBucketer()
-    private let calendar = Calendar.current
+    private let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f
+    }()
 
-    // Choose a bucket size; adjust as needed
-    enum TimeBucket {
-        case hour, day
-    }
-
-    private var bucket: TimeBucket {
-        // Prefer filter range if provided; fallback to data range
-        let first = startDate ?? data.first?.date
-        let last = endDate ?? data.last?.date
-        guard let first, let last else { return .hour }
-        let span = last.timeIntervalSince(first)
-        return span > 2 * 24 * 3600 ? .day : .hour
-    }
-
-    private func bucketStart(for date: Date) -> Date {
-        switch bucket {
-        case .hour:
-            return bucketer.bucketStart(for: date, bucket: .hour, calendar: calendar)
-        case .day:
-            return bucketer.bucketStart(for: date, bucket: .day, calendar: calendar)
-        }
-    }
-
-    private func nearestPoint(to date: Date) -> PricePoint? {
-        guard !data.isEmpty else { return nil }
-        // Binary search for nearest by date
-        var low = 0
-        var high = data.count - 1
-        while low < high {
-            let mid = (low + high) / 2
-            if data[mid].date < date {
-                low = mid + 1
-            } else {
-                high = mid
-            }
-        }
-        let idx = low
-        if idx == 0 { return data.first }
-        if idx >= data.count { return data.last }
-        let prev = data[idx - 1]
-        let curr = data[idx]
-        return abs(prev.date.timeIntervalSince(date)) < abs(curr.date.timeIntervalSince(date)) ? prev : curr
-    }
-
-    private var areaGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color.accentColor.opacity(0.25), Color.accentColor.opacity(0.02)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
-
-    private var lineGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color.accentColor, Color.accentColor.opacity(0.6)],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-    }
-
-    private var lineStrokeStyle: StrokeStyle { StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round) }
-
-    private func axisLabelText(for date: Date) -> Text {
-        switch bucket {
-        case .hour:
-            return Text(date, format: .dateTime.hour(.twoDigits(amPM: .omitted)))
-        case .day:
-            return Text(date, format: .dateTime.day().month(.abbreviated))
-        }
-    }
+    private let numberFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.maximumFractionDigits = 6
+        f.minimumFractionDigits = 2
+        return f
+    }()
 
     init(data: [(date: Date, price: Double)], startDate: Date? = nil, endDate: Date? = nil) {
-        self.data = data.map { PricePoint(date: $0.date, price: $0.price) }
+        self.data = data.map { PricePoint(date: $0.date, price: $0.price) }.sorted { $0.date < $1.date }
         self.startDate = startDate
         self.endDate = endDate
     }
 
+    private var visibleData: [PricePoint] {
+        guard !data.isEmpty else { return [] }
+        let lo = startDate ?? data.first!.date
+        let hi = endDate ?? data.last!.date
+        return data.filter { $0.date >= lo && $0.date <= hi }
+    }
+
+    private var xDomain: ClosedRange<Date>? {
+        guard let first = visibleData.first?.date, let last = visibleData.last?.date else { return nil }
+        if first == last {
+            return first.addingTimeInterval(-0.5)...last.addingTimeInterval(0.5)
+        }
+        return first...last
+    }
+
+    private var yDomain: ClosedRange<Double>? {
+        guard let minV = visibleData.map(\.price).min(), let maxV = visibleData.map(\.price).max(), minV.isFinite, maxV.isFinite else { return nil }
+        if minV == maxV { return (minV - 0.5)...(maxV + 0.5) }
+        let pad = (maxV - minV) * 0.08
+        return (minV - pad)...(maxV + pad)
+    }
+
     var body: some View {
-        Chart(data) { point in
-            AreaMark(
-                x: .value("Time", point.date),
-                y: .value("Price", point.price)
-            )
-            .interpolationMethod(.catmullRom)
-            .foregroundStyle(areaGradient)
-
-            LineMark(
-                x: .value("Time", point.date),
-                y: .value("Price", point.price)
-            )
-            .interpolationMethod(.catmullRom)
-            .lineStyle(lineStrokeStyle)
-            .foregroundStyle(lineGradient)
-
-            if let selectedDate {
-                RuleMark(x: .value("Selected", selectedDate))
-                    .foregroundStyle(Color.accentColor.opacity(0.4))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .annotation(position: .top, spacing: 0) {
-                        if let point = selectedPoint {
-                            VStack(spacing: 4) {
-                                Text(point.date, style: .time)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                Text(String(format: "%.4f", point.price))
+        Group {
+            if !visibleData.isEmpty {
+                Chart {
+                    ForEach(visibleData) { point in
+                        LineMark(
+                            x: .value("Date", point.date),
+                            y: .value("Price", point.price)
+                        )
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(Color.accentColor)
+                    }
+                    if let selectedDate,
+                       let nearest = visibleData.min(by: { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) }) {
+                        RuleMark(x: .value("Selected Date", nearest.date))
+                            .foregroundStyle(.secondary)
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4]))
+                        PointMark(
+                            x: .value("Date", nearest.date),
+                            y: .value("Price", nearest.price)
+                        )
+                        .symbolSize(60)
+                        .foregroundStyle(Color.accentColor)
+                        .annotation(position: .top, alignment: .leading) {
+                            let priceText = numberFormatter.string(from: NSNumber(value: nearest.price)) ?? String(format: "%.4f", nearest.price)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(priceText).bold()
+                                Text(dateFormatter.string(from: nearest.date))
                                     .font(.caption)
-                                    .bold()
+                                    .foregroundStyle(.secondary)
                             }
-                            .padding(8)
-                            .background(.thinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .padding(6)
+                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
                         }
                     }
-            }
-        }
-        .chartXSelection(value: $selectedDate)
-        .onChange(of: selectedDate) { _, newValue in
-            if let d = newValue {
-                selectedPoint = nearestPoint(to: d)
+                }
+                .chartXAxis {
+                    AxisMarks()
+                }
+                .chartYAxis {
+                    AxisMarks(position: .trailing)
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geo in
+                        Rectangle().fill(.clear).contentShape(Rectangle())
+                            .gesture(DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    let location = value.location
+                                    if let date: Date = proxy.value(atX: location.x, as: Date.self) {
+                                        selectedDate = date
+                                    }
+                                }
+                                .onEnded { _ in
+                                    selectedDate = nil
+                                }
+                            )
+                    }
+                }
+                .chartXScale(domain: (xDomain ?? {
+                    if let first = data.first?.date, let last = data.last?.date, first != last {
+                        return first...last
+                    } else if let only = data.first?.date {
+                        return only.addingTimeInterval(-0.5)...only.addingTimeInterval(0.5)
+                    } else {
+                        let now = Date()
+                        return now.addingTimeInterval(-0.5)...now.addingTimeInterval(0.5)
+                    }
+                }()))
+                .chartYScale(domain: (yDomain ?? {
+                    let allPrices = data.map { $0.price }
+                    if let minV = allPrices.min(), let maxV = allPrices.max(), minV.isFinite, maxV.isFinite {
+                        if minV == maxV { return (minV - 0.5)...(maxV + 0.5) }
+                        let pad = (maxV - minV) * 0.08
+                        return (minV - pad)...(maxV + pad)
+                    } else {
+                        return 0...1
+                    }
+                }()))
+                .animation(.easeInOut(duration: 0.2), value: startDate)
+                .animation(.easeInOut(duration: 0.2), value: endDate)
+                .id("\(startDate?.timeIntervalSince1970 ?? -1)|\(endDate?.timeIntervalSince1970 ?? -1)|\(visibleData.count)")
             } else {
-                selectedPoint = nil
+                VStack(spacing: 8) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                    Text("No data available")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 140)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.ultraThinMaterial)
+                )
             }
         }
-        .chartXAxis {
-            // Precompute tick values outside of the AxisContentBuilder to avoid control flow inside the builder
-            let firstDate = startDate ?? data.first?.date
-            let lastDate = endDate ?? data.last?.date
-            let span = (firstDate != nil && lastDate != nil) ? lastDate!.timeIntervalSince(firstDate!) : 0
-
-            let computedTicks: [Date] = {
-                // We want at most 4 ticks, evenly distributed across the span
-                let maxTicks = 4
-
-                guard let first = firstDate, let last = lastDate, first <= last else {
-                    return []
-                }
-
-                if bucket == .hour, span <= 24 * 3600 {
-                    // Align to 6-hour boundaries to create up to 4 buckets over 24h
-                    let cal = calendar
-                    let firstHour = cal.component(.hour, from: first)
-                    let alignedHour = (firstHour / 6) * 6
-                    let startAligned = cal.date(bySettingHour: alignedHour, minute: 0, second: 0, of: first) ?? first
-                    var t = startAligned
-                    var result: [Date] = []
-                    while t <= last {
-                        result.append(t)
-                        t = cal.date(byAdding: .hour, value: 6, to: t) ?? t.addingTimeInterval(6 * 3600)
-                    }
-                    if result.isEmpty { return [first, last].sorted() }
-                    if result.count <= maxTicks { return result }
-                    // Downsample to maxTicks (keep first and last, spread evenly)
-                    let count = result.count
-                    if maxTicks <= 2 { return [result.first!, result.last!].uniquedSorted() }
-                    var sampled: [Date] = []
-                    for i in 0..<maxTicks {
-                        let idx = Int(round(Double(i) * Double(count - 1) / Double(maxTicks - 1)))
-                        sampled.append(result[idx])
-                    }
-                    return Array(Set(sampled)).sorted()
-                } else {
-                    // Day bucket: compute bucket starts and then limit to max 4 evenly spaced ticks
-                    let dates = data.map { bucketStart(for: $0.date) }
-                    let unique = Array(Set(dates)).sorted()
-                    if unique.isEmpty { return [first, last].sorted() }
-                    if unique.count <= maxTicks { return unique }
-                    // Downsample to maxTicks (keep first and last, spread evenly)
-                    let count = unique.count
-                    if maxTicks <= 2 { return [unique.first!, unique.last!] }
-                    var sampled: [Date] = []
-                    for i in 0..<maxTicks {
-                        let idx = Int(round(Double(i) * Double(count - 1) / Double(maxTicks - 1)))
-                        sampled.append(unique[idx])
-                    }
-                    return Array(Set(sampled)).sorted()
-                }
-            }()
-
-            // Helper to ensure two elements unique & sorted when needed
-
-            AxisMarks(values: computedTicks) { value in
-                AxisGridLine().foregroundStyle(Color.clear)
-                AxisTick()
-                AxisValueLabel {
-                    if let d = value.as(Date.self) {
-                        axisLabelText(for: d)
-                    }
-                }
-            }
-        }
-        .chartYAxis(content: {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { _ in
-                AxisGridLine()
-                    .foregroundStyle(Color.primary.opacity(0.06))
-            }
-        })
-        .chartPlotStyle(content: { plot in
-            let bg = AnyShapeStyle(.ultraThinMaterial)
-            plot
-                .background(bg)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        })
-    }
-}
-
-private extension Array where Element == Date {
-    func uniquedSorted() -> [Date] {
-        Array(Set(self)).sorted()
     }
 }
 

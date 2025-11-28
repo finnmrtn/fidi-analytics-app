@@ -3,7 +3,6 @@ import SwiftUI
 public struct StackedMetricCardStyle {
     public var background: AnyShapeStyle
     public var borderColor: Color?
-    public var iconSystemName: String?
     public var iconImage: Image?
     public var iconTint: Color
     public var title: String
@@ -16,27 +15,27 @@ public struct StackedMetricCardStyle {
     public var shadowRadius: CGFloat
     public var shadowY: CGFloat
     public var accessoryContent: (() -> AnyView)?
+    public var showsHandle: Bool
     
     public init(
         background: some ShapeStyle,
         borderColor: Color? = nil,
-        iconSystemName: String? = nil,
         iconImage: Image? = nil,
-        iconTint: Color = .white,
+        iconTint: Color = AppTheme.textPrimary,
         title: String,
         subtitle: String? = nil,
         value: String,
-        foreground: Color = .white,
+        foreground: Color = AppTheme.textPrimary,
         height: CGFloat = 180,
         cornerRadius: CGFloat = 38,
         shadowColor: Color = Color.black.opacity(0.18),
         shadowRadius: CGFloat = 75,
         shadowY: CGFloat = 15,
-        accessoryContent: (() -> AnyView)? = nil
+        accessoryContent: (() -> AnyView)? = nil,
+        showsHandle: Bool = false
     ) {
         self.background = AnyShapeStyle(background)
         self.borderColor = borderColor
-        self.iconSystemName = iconSystemName
         self.iconImage = iconImage
         self.iconTint = iconTint
         self.title = title
@@ -49,6 +48,7 @@ public struct StackedMetricCardStyle {
         self.shadowRadius = shadowRadius
         self.shadowY = shadowY
         self.accessoryContent = accessoryContent
+        self.showsHandle = showsHandle
     }
 }
 
@@ -56,8 +56,11 @@ public struct StackedMetricCard: View {
     public let title: String
     public let subtitle: String?
     public let valueText: String
+    public let primaryValueIcon: Image?
+    public let primaryValueText: String?
+    public let secondaryValueIcon: Image?
+    public let secondaryValueText: String?
     public let background: AnyShapeStyle
-    public let iconSystemName: String?
     public let iconImage: Image?
     public let iconTint: Color
     public let borderColor: Color?
@@ -68,29 +71,37 @@ public struct StackedMetricCard: View {
     public let shadowRadius: CGFloat
     public let shadowY: CGFloat
     public let accessoryContent: (() -> AnyView)?
+    public let showsHandle: Bool
     
     public init(
         title: String,
         subtitle: String? = nil,
         valueText: String,
+        primaryValueIcon: Image? = nil,
+        primaryValueText: String? = nil,
+        secondaryValueIcon: Image? = nil,
+        secondaryValueText: String? = nil,
         background: some ShapeStyle,
-        iconSystemName: String? = nil,
         iconImage: Image? = nil,
-        iconTint: Color = .white,
+        iconTint: Color = AppTheme.textPrimary,
         borderColor: Color? = nil,
-        foreground: Color = .white,
+        foreground: Color = AppTheme.textPrimary,
         height: CGFloat = 180,
         cornerRadius: CGFloat = 38,
         shadowColor: Color = Color.black.opacity(0.18),
         shadowRadius: CGFloat = 75,
         shadowY: CGFloat = 15,
-        accessoryContent: (() -> AnyView)? = nil
+        accessoryContent: (() -> AnyView)? = nil,
+        showsHandle: Bool = false
     ) {
         self.title = title
         self.subtitle = subtitle
         self.valueText = valueText
+        self.primaryValueIcon = primaryValueIcon
+        self.primaryValueText = primaryValueText
+        self.secondaryValueIcon = secondaryValueIcon
+        self.secondaryValueText = secondaryValueText
         self.background = AnyShapeStyle(background)
-        self.iconSystemName = iconSystemName
         self.iconImage = iconImage
         self.iconTint = iconTint
         self.borderColor = borderColor
@@ -101,14 +112,18 @@ public struct StackedMetricCard: View {
         self.shadowRadius = shadowRadius
         self.shadowY = shadowY
         self.accessoryContent = accessoryContent
+        self.showsHandle = showsHandle
     }
     
     public init(style: StackedMetricCardStyle) {
         self.title = style.title
         self.subtitle = style.subtitle
         self.valueText = style.value
+        self.primaryValueIcon = nil
+        self.primaryValueText = nil
+        self.secondaryValueIcon = nil
+        self.secondaryValueText = nil
         self.background = style.background
-        self.iconSystemName = style.iconSystemName
         self.iconImage = style.iconImage
         self.iconTint = style.iconTint
         self.borderColor = style.borderColor
@@ -119,31 +134,30 @@ public struct StackedMetricCard: View {
         self.shadowRadius = style.shadowRadius
         self.shadowY = style.shadowY
         self.accessoryContent = style.accessoryContent
+        self.showsHandle = style.showsHandle
     }
     
     public var body: some View {
         VStack(spacing: 0) {
-            // Top handle
-            Rectangle()
-                .frame(width: 36, height: 5)
-                .foregroundColor(foreground.opacity(0.2))
-                .clipShape(Capsule())
-                .padding(.top, 8)
-                .padding(.bottom, 12)
+            if showsHandle {
+                Rectangle()
+                    .frame(width: 36, height: 1)
+                    .foregroundColor(foreground.opacity(0.2))
+                    .clipShape(Capsule())
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
+            }
             
-            HStack(spacing: 66) {
-                HStack(spacing: 8) {
+            HStack(alignment: .center, spacing: 0) {
+                HStack(alignment: .center, spacing: 8) {
                     ZStack {
                         if let iconImage = iconImage {
                             iconImage
                                 .resizable()
+                                .renderingMode(.template)
+                                .foregroundStyle(iconTint)
                                 .scaledToFit()
-                                .frame(width: 20, height: 20)
-                                .foregroundColor(iconTint)
-                        } else if let name = iconSystemName {
-                            Image(systemName: name)
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(iconTint)
+                                .frame(width: 24, height: 24)
                         }
                     }
                     .frame(width: 48, height: 48)
@@ -153,28 +167,72 @@ public struct StackedMetricCard: View {
                     )
                     .overlay(
                         Circle()
-                            .stroke((borderColor ?? Color.white.opacity(0.15)), lineWidth: 1)
+                            .stroke((borderColor ?? AppTheme.borderSubtle), lineWidth: 2)
                     )
                     
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
                         if let subtitle = subtitle {
                             Text(subtitle)
                                 .font(.subheadline.weight(.medium))
                                 .foregroundColor(foreground.opacity(0.7))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                         }
                         Text(title)
-                            .font(.title3.weight(.semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(foreground)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
-                    .frame(minWidth: 77, alignment: .leading)
+                    .frame(minWidth: 80, alignment: .leading)
                 }
                 Spacer()
-                Text(valueText)
-                    .font(.system(size: 32, weight: .semibold))
-                    .foregroundColor(foreground)
+                Group {
+                    if primaryValueIcon != nil || primaryValueText != nil || secondaryValueIcon != nil || secondaryValueText != nil {
+                        if (primaryValueIcon != nil || primaryValueText != nil) && (secondaryValueIcon != nil || secondaryValueText != nil) {
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                HStack(spacing: 6) {
+                                    if let icon = primaryValueIcon { icon.resizable().renderingMode(.template).foregroundColor(foreground).frame(width: 18, height: 18) }
+                                    Text(primaryValueText ?? "")
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .monospacedDigit()
+                                        .foregroundColor(foreground)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                }
+                                HStack(spacing: 6) {
+                                    if let icon = secondaryValueIcon { icon.resizable().renderingMode(.template).foregroundColor(foreground).frame(width: 18, height: 18) }
+                                    Text(secondaryValueText ?? "")
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .monospacedDigit()
+                                        .foregroundColor(foreground.opacity(0.95))
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                }
+                            }
+                        } else {
+                            // If only one value is provided, show it alone (primary preferred)
+                            HStack(spacing: 6) {
+                                if let icon = (primaryValueIcon ?? secondaryValueIcon) { icon.resizable().renderingMode(.template).foregroundColor(foreground).frame(width: 18, height: 18) }
+                                Text((primaryValueText ?? secondaryValueText) ?? "")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .monospacedDigit()
+                                    .foregroundColor(foreground)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                        }
+                    } else {
+                        Text(valueText)
+                            .font(.system(size: 26, weight: .semibold))
+                            .foregroundColor(foreground)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 10)
+            Spacer()
             
             if let accessoryContent = accessoryContent {
                 accessoryContent()
@@ -182,8 +240,9 @@ public struct StackedMetricCard: View {
                     .padding(.bottom, 10)
             }
         }
+        .padding(.top, 16)
         .frame(maxWidth: .infinity)
-        .frame(height: height)
+        .frame(height: 200)
         .background(background)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .shadow(color: shadowColor, radius: shadowRadius, y: shadowY)
@@ -211,12 +270,13 @@ public func formatCompactNumber(_ value: Double) -> String {
                 title: "Transactions",
                 subtitle: "Network",
                 valueText: "3.343M",
-                background: LinearGradient(colors: [Color(red: 0.49, green: 0.55, blue: 1), Color(red: 0.49, green: 0.55, blue: 1)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                iconSystemName: "square.grid.2x2.fill",
-                iconTint: .white,
-                borderColor: Color.white.opacity(0.15),
-                foreground: .white,
-                height: 180
+                background: AppTheme.StackedCards.Analytics.Card0.background,
+                iconImage: Image("txn"),
+                iconTint: AppTheme.StackedCards.Analytics.Card0.iconTint,
+                borderColor: AppTheme.StackedCards.Analytics.Card0.border,
+                foreground: AppTheme.StackedCards.Analytics.Card0.foreground,
+                height: 180,
+                showsHandle: false
             )
             .zIndex(1)
 
@@ -224,12 +284,13 @@ public func formatCompactNumber(_ value: Double) -> String {
                 title: "UAW",
                 subtitle: "Network",
                 valueText: "144.3k",
-                background: LinearGradient(colors: [Color(red: 0.77, green: 0.80, blue: 1), Color(red: 0.77, green: 0.80, blue: 1)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                iconSystemName: "person.3.fill",
-                iconTint: Color(red: 0.23, green: 0.27, blue: 0.57),
-                borderColor: Color(red: 0.23, green: 0.27, blue: 0.57).opacity(0.15),
-                foreground: Color(red: 0.23, green: 0.27, blue: 0.57),
-                height: 140
+                background: AppTheme.StackedCards.Analytics.Card1.background,
+                iconImage: Image("uaw"),
+                iconTint: AppTheme.StackedCards.Analytics.Card1.iconTint,
+                borderColor: AppTheme.StackedCards.Analytics.Card1.border,
+                foreground: AppTheme.StackedCards.Analytics.Card1.foreground,
+                height: 140,
+                showsHandle: false
             )
             .offset(y: -45)
             .zIndex(2)
@@ -238,12 +299,13 @@ public func formatCompactNumber(_ value: Double) -> String {
                 title: "Gas Fees",
                 subtitle: "Network",
                 valueText: "3.343M",
-                background: LinearGradient(colors: [Color(red: 0.94, green: 0.94, blue: 0.94), Color(red: 0.91, green: 0.91, blue: 0.91)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                iconSystemName: "flame.fill",
-                iconTint: Color(red: 0.41, green: 0.41, blue: 0.41),
-                borderColor: Color(red: 0.86, green: 0.87, blue: 0.88),
-                foreground: Color(red: 0.18, green: 0.18, blue: 0.18),
-                height: 100
+                background: AppTheme.StackedCards.Analytics.Card2.background,
+                iconImage: Image("gasfee"),
+                iconTint: AppTheme.StackedCards.Analytics.Card2.iconTint,
+                borderColor: AppTheme.StackedCards.Analytics.Card2.border,
+                foreground: AppTheme.StackedCards.Analytics.Card2.foreground,
+                height: 100,
+                showsHandle: false
             )
             .offset(y: -90)
             .zIndex(3)
@@ -252,17 +314,19 @@ public func formatCompactNumber(_ value: Double) -> String {
                 title: "Transaction Fees",
                 subtitle: "Network",
                 valueText: "19,603",
-                background: Color.white,
-                iconSystemName: "creditcard.fill",
-                iconTint: Color(red: 1, green: 0.26, blue: 0.27),
-                borderColor: Color(red: 1, green: 0.26, blue: 0.27).opacity(0.15),
-                foreground: Color(red: 0.07, green: 0.08, blue: 0.09),
-                height: 60
+                background: AppTheme.StackedCards.Analytics.Card3.background,
+                iconImage: Image("networkfee"),
+                iconTint: AppTheme.StackedCards.Analytics.Card3.iconTint,
+                borderColor: AppTheme.StackedCards.Analytics.Card3.border,
+                foreground: AppTheme.StackedCards.Analytics.Card3.foreground,
+                height: 80,
+                showsHandle: false
             )
             .offset(y: -135)
             .zIndex(4)
         }
         .frame(maxWidth: .infinity)
-        .padding()
+        .ignoresSafeArea(edges: .bottom)
+        .padding(.horizontal)
     }
 }
