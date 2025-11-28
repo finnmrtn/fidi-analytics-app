@@ -1,48 +1,87 @@
 import Foundation
 
-public enum ChartAggregation {
-    /// Aggregates raw (date, value, project) tuples into Top-N categories plus an "Other" bucket per date,
-    /// returning StackedBarChartPoint data and a colorDomain in ranked order (Top-N + "Other").
-    /// - Parameters:
-    ///   - points: Raw tuples representing (date, value, project)
-    ///   - topCount: Number of top categories to keep before collapsing the rest into "Other". Default: 9
-    /// - Returns: (data: [StackedBarChartPoint], colorDomain: [String])
+struct StackedBarChartPoint {
+    let date: Date
+    let name: String
+    let value: Double
+}
+
+enum ChartAggregation {
+    private static let bucketer = TimeBucketer()
+
     public static func aggregateTopNWithOther(
         from points: [(date: Date, value: Double, project: String)],
-        topCount: Int = 9
+        topCount: Int,
+        bucket: TimeBucket?,
+        calendar: Calendar
     ) -> (data: [StackedBarChartPoint], colorDomain: [String]) {
-        // Compute total per project
-        let totalsByProject: [String: Double] = points.reduce(into: [:]) { dict, item in
-            dict[item.project, default: 0] += item.value
-        }
-        // Top-N ranked by total desc
-        let rankedTop: [String] = totalsByProject
-            .sorted { $0.value > $1.value }
-            .prefix(topCount)
-            .map { $0.key }
+        // Return empty when no points
+        guard !points.isEmpty else { return (data: [], colorDomain: []) }
 
-        // Domain for colors (Top-N + Other)
-        let colorDomain: [String] = rankedTop + ["Other"]
-
-        // Aggregate per (date, category) where non-top collapse into "Other"
-        let aggregatedByDateAndProject: [Date: [String: Double]] = points.reduce(into: [:]) { result, item in
-            let category = rankedTop.contains(item.project) ? item.project : "Other"
-            var inner = result[item.date] ?? [:]
-            inner[category, default: 0] += item.value
-            result[item.date] = inner
+        // Helper to compute bucket start
+        func bucketStart(_ d: Date) -> Date {
+            guard let bucket else { return d }
+            return bucketer.bucketStart(for: d, bucket: bucket, calendar: calendar)
         }
 
-        // Flatten back into points and sort by date then category
-        let data: [StackedBarChartPoint] = aggregatedByDateAndProject.flatMap { (date, buckets) in
-            buckets.map { (project, total) in
-                StackedBarChartPoint(date: date, value: total, category: project)
+        // 1) Sum per (bucketStart, project)
+        var byBucketProject: [Date: [String: Double]] = [:]
+        for p in points {
+            let b = bucketStart(p.date)
+            var perProject = byBucketProject[b] ?? [:]
+            perProject[p.project, default: 0] += p.value
+            byBucketProject[b] = perProject
+        }
+
+        // 2) Global totals to select stable Top-9
+        var globalTotals: [String: Double] = [:]
+        for (_, perProject) in byBucketProject {
+            for (project, v) in perProject {
+                globalTotals[project, default: 0] += v
             }
         }
-        .sorted { lhs, rhs in
-            if lhs.date == rhs.date { return lhs.category < rhs.category }
-            return lhs.date < rhs.date
+        let orderedTop9: [String] = globalTotals
+            .sorted { lhs, rhs in
+                if lhs.value == rhs.value { return lhs.key < rhs.key }
+                return lhs.value > rhs.value
+            }
+            .prefix(9)
+            .map { $0.key }
+        let topSet = Set(orderedTop9)
+
+        // 3) Emit exactly 10 segments per bucket: up to 9 Top projects present + 1 Other
+        var data: [StackedBarChartPoint] = []
+        let sortedBuckets = byBucketProject.keys.sorted()
+        for b in sortedBuckets {
+            let perProject = byBucketProject[b] ?? [:]
+            var bucketPoints: [StackedBarChartPoint] = []
+
+            // Add Top-9 (only those with value > 0 in this bucket), in stable order
+            for project in orderedTop9 {
+                if let v = perProject[project], v > 0 {
+                    bucketPoints.append(StackedBarChartPoint(date: b, name: project, value: v))
+                }
+            }
+
+            // Sum remaining projects into Other
+            var otherSum = 0.0
+            for (project, v) in perProject where !topSet.contains(project) {
+                otherSum += v
+            }
+            // Always include exactly one Other segment per bucket (even if 0),
+            // to keep a consistent 10-segment structure visually where possible.
+            // If you prefer to hide zero, set the condition to (otherSum > 0).
+            bucketPoints.append(StackedBarChartPoint(date: b, name: "Other", value: otherSum))
+
+            // Ensure at most 10 segments (Top up to 9 + Other)
+            // If fewer than 9 Top projects have data in this bucket, we still keep Other as the 10th.
+            data.append(contentsOf: bucketPoints)
         }
 
-        return (data, colorDomain)
+        // 4) Color domain: stable Top-9 + Other
+        var colorDomain = orderedTop9
+        colorDomain.append("Other")
+        return (data: data, colorDomain: colorDomain)
     }
 }
+
