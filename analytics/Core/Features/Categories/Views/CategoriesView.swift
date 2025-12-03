@@ -178,11 +178,11 @@ struct CategoriesView: View {
                         primaryValueText: viewModel.prettyNumber(c0.totalTransactions),
                         secondaryValueIcon: Image("uaw_title"),
                         secondaryValueText: viewModel.prettyNumber(c0.totalUAW),
-                        background: Color(hex: "#FFD341"),
+                        background: AppTheme.StackedCard.CategoriesPerPosition.background(for: 0),
                         iconImage: Image(categoryAssetName(for: c0.id)),
-                        iconTint: Color(hex: "#824500"),
-                        borderColor: Color(hex: "#824500").opacity(0.15),
-                        foreground: Color(hex: "#824500"),
+                        iconTint: AppTheme.StackedCard.CategoriesPerPosition.iconTint(for: 0),
+                        borderColor: AppTheme.StackedCard.CategoriesPerPosition.border(for: 0),
+                        foreground: AppTheme.StackedCard.CategoriesPerPosition.foreground(for: 0),
                         height: 180
                     )
                 }
@@ -206,11 +206,11 @@ struct CategoriesView: View {
                         primaryValueText: viewModel.prettyNumber(c1.totalTransactions),
                         secondaryValueIcon: Image("uaw_title"),
                         secondaryValueText: viewModel.prettyNumber(c1.totalUAW),
-                        background: Color("BrandColor"),
+                        background: AppTheme.StackedCard.CategoriesPerPosition.background(for: 1),
                         iconImage: Image(categoryAssetName(for: c1.id)),
-                        iconTint: Color("TxIconColor"),
-                        borderColor: Color("TxStrokeColor"),
-                        foreground: Color("TxIconColor"),
+                        iconTint: AppTheme.StackedCard.CategoriesPerPosition.iconTint(for: 1),
+                        borderColor: AppTheme.StackedCard.CategoriesPerPosition.border(for: 1),
+                        foreground: AppTheme.StackedCard.CategoriesPerPosition.foreground(for: 1),
                         height: 140
                     )
                 }
@@ -235,11 +235,11 @@ struct CategoriesView: View {
                         primaryValueText: viewModel.prettyNumber(c2.totalTransactions),
                         secondaryValueIcon: Image("uaw_title"),
                         secondaryValueText: viewModel.prettyNumber(c2.totalUAW),
-                        background: LinearGradient(colors: [Color(hex: "#F4F5F8"), Color(hex: "#E8E9EC")], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        background: AppTheme.StackedCard.CategoriesPerPosition.background(for: 2),
                         iconImage: Image(categoryAssetName(for: c2.id)),
-                        iconTint: Color(hex: "#2E2E2E"),
-                        borderColor: Color(hex: "#74B9FF").opacity(0.15),
-                        foreground: Color(hex: "#2E2E2E"),
+                        iconTint: AppTheme.StackedCard.CategoriesPerPosition.iconTint(for: 2),
+                        borderColor: AppTheme.StackedCard.CategoriesPerPosition.border(for: 2),
+                        foreground: AppTheme.StackedCard.CategoriesPerPosition.foreground(for: 2),
                         height: 100
                     )
                 }
@@ -262,11 +262,11 @@ struct CategoriesView: View {
                     primaryValueText: viewModel.prettyNumber(other.totalTransactions),
                     secondaryValueIcon: Image("uaw_title"),
                     secondaryValueText: viewModel.prettyNumber(other.totalUAW),
-                    background: Color.white,
+                    background: AppTheme.StackedCard.CategoriesPerPosition.background(for: 3),
                     iconImage: Image(categoryAssetName(for: other.id)),
-                    iconTint: Color(hex: "#121416"),
-                    borderColor: Color.highlight,
-                    foreground: Color(hex: "#121416"),
+                    iconTint: AppTheme.StackedCard.CategoriesPerPosition.iconTint(for: 3),
+                    borderColor: AppTheme.StackedCard.CategoriesPerPosition.border(for: 3),
+                    foreground: AppTheme.StackedCard.CategoriesPerPosition.foreground(for: 3),
                     height: 100
                 )
             }
@@ -326,6 +326,9 @@ struct CategoriesView: View {
                 }
             }
 #endif
+            if let firstNetwork = Network.allCases.first {
+                viewModel.updateNetwork(LocalNetworkShim(rawValue: firstNetwork.rawValue) ?? .moonbeam)
+            }
         }
         .onChange(of: selectionStore.selectedNetwork) { _, newNetwork in
             viewModel.updateNetwork(LocalNetworkShim(rawValue: newNetwork.rawValue) ?? .moonbeam)

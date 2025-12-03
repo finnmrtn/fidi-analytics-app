@@ -47,8 +47,8 @@ public struct MetricSheetTemplate<Content: View>: View {
         onClose: @escaping () -> Void,
         onOpenFilter: @escaping () -> Void,
         icon: Image? = nil,
-        iconTint: Color = AppTheme.textPrimary,
-        iconStrokeColor: Color = AppTheme.borderSubtle,
+        iconTint: Color = .primary,
+        iconStrokeColor: Color = .secondary.opacity(0.2),
         variant: MetricSheetVariant = .standard,
         headerUAWTotal: String? = nil,
         headerTxTotal: String? = nil,
@@ -155,14 +155,14 @@ public struct MetricSheetTemplate<Content: View>: View {
                             .background(.ultraThinMaterial, in: Circle())
                             .overlay(
                                 Circle()
-                                    .strokeBorder(.white.opacity(0.35), lineWidth: 0.5)
+                                    .strokeBorder(iconStrokeColor, lineWidth: 0.5)
                                     .blendMode(.overlay)
                             )
                 
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Close")
-                }.padding(.horizontal, 8)
+                }
 
 
                 content
@@ -218,11 +218,11 @@ public struct MetricSheetTemplate<Content: View>: View {
         // Placeholder content
         VStack {
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppTheme.Analytics.backing)
+                .fill(Color.secondary.opacity(0.08))
                 .frame(height: 200)
                 .overlay(
                     Text("Your chart or custom content here")
-                        .foregroundStyle(AppTheme.textSecondary)
+                        .foregroundStyle(.secondary)
                 )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

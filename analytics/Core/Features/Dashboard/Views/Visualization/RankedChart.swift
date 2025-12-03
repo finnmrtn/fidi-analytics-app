@@ -7,6 +7,57 @@
 
 import SwiftUI
 
+struct LeftCapsuleShape: Shape {
+    let radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        
+        let height = rect.height
+        let width = rect.width
+        
+        path.move(to: CGPoint(x: radius, y: 0))
+        path.addLine(to: CGPoint(x: width, y: 0))
+        path.addLine(to: CGPoint(x: width, y: height))
+        path.addLine(to: CGPoint(x: radius, y: height))
+        path.addArc(center: CGPoint(x: radius, y: height / 2), radius: radius, startAngle: Angle(degrees: 90), endAngle: Angle(degrees: -90), clockwise: true)
+        path.closeSubpath()
+        
+        return path
+    }
+}
+
+private struct RoundedCornersShape: Shape {
+    var tl: CGFloat = 0
+    var tr: CGFloat = 0
+    var bl: CGFloat = 0
+    var br: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+
+        let w = rect.size.width
+        let h = rect.size.height
+        let tr = min(min(self.tr, h/2), w/2)
+        let tl = min(min(self.tl, h/2), w/2)
+        let bl = min(min(self.bl, h/2), w/2)
+        let br = min(min(self.br, h/2), w/2)
+
+        path.move(to: CGPoint(x: tl, y: 0))
+        path.addLine(to: CGPoint(x: w - tr, y: 0))
+        path.addArc(center: CGPoint(x: w - tr, y: tr), radius: tr, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+        path.addLine(to: CGPoint(x: w, y: h - br))
+        path.addArc(center: CGPoint(x: w - br, y: h - br), radius: br, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        path.addLine(to: CGPoint(x: bl, y: h))
+        path.addArc(center: CGPoint(x: bl, y: h - bl), radius: bl, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        path.addLine(to: CGPoint(x: 0, y: tl))
+        path.addArc(center: CGPoint(x: tl, y: tl), radius: tl, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        path.closeSubpath()
+
+        return path
+    }
+}
+
 struct RankedChart: View {
     let dapps: [(name: String, gasFees: Double)]
 
@@ -56,26 +107,29 @@ struct HorizontalBarRow: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(Color.shade)
                     .frame(height: 48)
 
                 HStack(spacing: 0) {
                     HStack(spacing: 6) {
-                        Rectangle()
-                            .fill(.white)
-                            .frame(width: 3)
-                            .cornerRadius(4)
+                        if !isSmallBar {
+                            Capsule()
+                                .fill(.white)
+                                .frame(width: 3, height: 32)
+                        }
 
                         if !isSmallBar {
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text(name)
-                                    .font(.system(size: 14))
+                                    .font(.system(size: 12))
+                                    .fontWeight(.semibold)
                                     .foregroundColor(.white)
                                     .lineLimit(1)
 
                                 Text(value.formatted(.number.notation(.compactName).precision(.fractionLength(0))))
                                     .font(.system(size: 14))
+                                    .fontWeight(.semibold)
                                     .foregroundColor(.white)
                             }
                         }
@@ -84,32 +138,51 @@ struct HorizontalBarRow: View {
                     .padding(.vertical, isSmallBar ? 0 : 8)
                     .frame(width: geometry.size.width * barWidthRatio, alignment: .leading)
                     .frame(height: 48)
-                    .background(color)
-                    .cornerRadius(16)
+                    .background(
+                        ZStack(alignment: .leading) {
+                            // Backing: full width, masked to pill
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(Color.shade)
+                                .frame(height: 48)
+
+                            // Data bar: fills proportionally from the left
+                            Rectangle()
+                                .fill(color)
+                                .frame(width: geometry.size.width * barWidthRatio, height: 48)
+                        }
+                        .mask(
+                            RoundedCornersShape(
+                                tl: 12,
+                                tr: 12,
+                                bl: 12,
+                                br: 12
+                            )
+                        )
+                    )
 
                     if isSmallBar {
                         HStack(spacing: 6) {
-                            Rectangle()
-                                .fill(Color(red: 0.94, green: 0.94, blue: 0.94))
-                                .frame(width: 3)
-                                .cornerRadius(4)
+                            Capsule()
+                                .fill(Color.shade)
+                                .frame(width: 3, height: 32)
+                                .padding(4)
 
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text(name)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(Color(red: 0.41, green: 0.41, blue: 0.41))
-                                    .lineLimit(1)
+                                    .font(.system(size: 12))
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Color.subtext)
+                                    .lineLimit(2)
 
                                 Text(value.formatted(.number.notation(.compactName).precision(.fractionLength(0))))
                                     .font(.system(size: 14))
-                                    .foregroundColor(Color.backing)
-                            }
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Color.black)
+                            }.padding(.trailing, 8).padding(.vertical, 4)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(.white)
+                        .background(Color.backing)
                         .cornerRadius(8)
-                        .padding(.leading, 10)
+                        .padding(4)
                     }
 
                     Spacer(minLength: 0)
@@ -133,3 +206,4 @@ struct HorizontalBarRow: View {
             .padding(16)
     }
 }
+

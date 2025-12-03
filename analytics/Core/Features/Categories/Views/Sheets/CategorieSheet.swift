@@ -85,33 +85,45 @@ private struct CategoryDetailsSheet: View {
     var backingColor: Color?
     var viewModel: CategoriesViewModel
 
+    private func mapLocalToShared(_ local: LocalCategoryKindShim) -> CategoryKind {
+        switch local {
+        case .dex: return .dex
+        case .nft: return .nfts
+        case .gaming: return .gaming
+        case .lending: return .lending
+        case .bridge: return .bridges
+        case .infrastructure: return .infrastructure
+        case .other: return .other
+        }
+    }
+
     var body: some View {
         // Compute dynamic slice color from mock/example if available
-        let color = backingColor ?? defaultColor(for: category)
         let iconName: String = categoryAssetName(for: category)
         let icon = Image(iconName).renderingMode(.template)
 
         let slices = viewModel.topThreePlusOtherSlices()
-        // Map CategoryKind to String id for slice comparison
-        let currentSlice = slices.first(where: { String(describing: $0.id) == category.id }) ?? slices.last
+        let cardIndex = slices.firstIndex(where: { mapLocalToShared($0.id) == category }) ?? 3
+        let currentSlice = slices.first(where: { mapLocalToShared($0.id) == category })
 
-        // Determine card index (1,2,3,4) of the current category among top three + other
-        let cardIndex: Int = {
-            if let currentSlice, let idx = slices.firstIndex(where: { String(describing: $0.id) == String(describing: currentSlice.id) }) {
-                return idx
-            } else {
-                return 3 // Other
-            }
-        }()
+
+        let themeBackground = AppTheme.StackedCard.CategoriesPerPosition.background(for: cardIndex)
+        let themeIconTint = AppTheme.StackedCard.CategoriesPerPosition.iconTint(for: cardIndex)
+        let themeBorder = AppTheme.StackedCard.CategoriesPerPosition.border(for: cardIndex)
+        let themeForeground = AppTheme.StackedCard.CategoriesPerPosition.foreground(for: cardIndex)
+
+        // Local override: for "Other" use a neutral backing background explicitly.
+        let isOther = (category == .other)
+        let effectiveBackground: Color = isOther ? (backingColor ?? Color(Color.backing)) : themeBackground
+        let effectiveIconTint: Color = isOther ? Color(Color.subtext) : themeIconTint
+        let effectiveBorder: Color = isOther ? Color(Color.subtext).opacity(0.15) : themeBorder
+        let effectiveForeground: Color = isOther ? Color(Color.black) : themeForeground
+
+        let color = effectiveBackground
+
 
         let position = CardPosition(rawValue: cardIndex) ?? .four
-        let headerTints = SheetHeaderTints(
-            iconTint: AppTheme.Sheets.CategoriesPerPosition.iconTint(for: cardIndex),
-            iconStroke: AppTheme.Sheets.CategoriesPerPosition.iconStroke(for: cardIndex),
-            totalsIconTint: AppTheme.Sheets.CategoriesPerPosition.totalsIconTint,
-            totalsTextTint: AppTheme.Sheets.CategoriesPerPosition.totalsTextTint,
-            titleText: AppTheme.Sheets.CategoriesPerPosition.titleText
-        )
+
 
         let headerUAW = currentSlice.map { viewModel.prettyNumber($0.totalUAW) }
         let headerTx = currentSlice.map { viewModel.prettyNumber($0.totalTransactions) }
@@ -132,14 +144,14 @@ private struct CategoryDetailsSheet: View {
                     onClose: { showSheet = false },
                     onOpenFilter: {},
                     icon: icon,
-                    iconTint: headerTints.iconTint,
-                    iconStrokeColor: headerTints.iconStroke,
+                    iconTint: effectiveIconTint,
+                    iconStrokeColor: effectiveBorder,
                     variant: .categories,
                     headerUAWTotal: headerUAW,
                     headerTxTotal: headerTx,
-                    headerTotalsIconTint: headerTints.totalsIconTint,
-                    headerTotalsTextTint: headerTints.totalsTextTint,
-                    titleTextTint: headerTints.titleText
+                    headerTotalsIconTint: effectiveIconTint,
+                    headerTotalsTextTint: effectiveForeground,
+                    titleTextTint: effectiveForeground
                 ) {
                     VStack(spacing: 8) {
                         // Table content inside white box with 24px corner radius
@@ -149,13 +161,12 @@ private struct CategoryDetailsSheet: View {
                         }
                         .background(
                             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                .fill(Color(.systemBackground))
+                                .fill(Color(Color.backing))
                         )
                     }
                    
                 }
-                .padding(.top, 16)
-                .padding(.horizontal, 8)
+                .padding(16)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
@@ -170,42 +181,7 @@ private struct SheetHeaderTints {
     let titleText: Color
 }
 
-private func headerTintsFor(position: CardPosition) -> SheetHeaderTints {
-    switch position {
-    case .one:
-        return SheetHeaderTints(
-            iconTint: AppTheme.StackedCards.Categories.Card0.iconTint,
-            iconStroke: AppTheme.StackedCards.Categories.Card0.border,
-            totalsIconTint: AppTheme.StackedCards.Categories.Card0.iconTint,
-            totalsTextTint: AppTheme.textSecondary,
-            titleText: AppTheme.textPrimary
-        )
-    case .two:
-        return SheetHeaderTints(
-            iconTint: AppTheme.StackedCards.Categories.Card1.iconTint,
-            iconStroke: AppTheme.StackedCards.Categories.Card1.border,
-            totalsIconTint: AppTheme.StackedCards.Categories.Card1.iconTint,
-            totalsTextTint: AppTheme.textSecondary,
-            titleText: AppTheme.textPrimary
-        )
-    case .three:
-        return SheetHeaderTints(
-            iconTint: AppTheme.StackedCards.Categories.Card2.iconTint,
-            iconStroke: AppTheme.StackedCards.Categories.Card2.border,
-            totalsIconTint: AppTheme.StackedCards.Categories.Card2.iconTint,
-            totalsTextTint: AppTheme.textSecondary,
-            titleText: AppTheme.textPrimary
-        )
-    case .four:
-        return SheetHeaderTints(
-            iconTint: AppTheme.StackedCards.Categories.Card3.iconTint,
-            iconStroke: AppTheme.StackedCards.Categories.Card3.border,
-            totalsIconTint: AppTheme.StackedCards.Categories.Card3.iconTint,
-            totalsTextTint: AppTheme.textSecondary,
-            titleText: AppTheme.textPrimary
-        )
-    }
-}
+
 
 // MARK: - Helpers reused from other files
 
@@ -275,22 +251,8 @@ private func kindDisplayName(_ kind: CategoryKind) -> String {
 }
 
 private func defaultColor(for kind: CategoryKind) -> Color {
-    // Per-category tint used for icons and text; falls back to BrandColor
-    switch kind {
-    case .defi: return Color(hex: "#FFD341")
-    case .gaming: return Color(hex: "#7E88FF")
-    case .nfts: return Color(hex: "#73BAFF")
-    case .dex: return Color(hex: "#36D19E")
-    case .bridges: return Color(hex: "#FF8A65")
-    case .dao: return Color(hex: "#9C27B0")
-    case .depin: return Color(hex: "#00BCD4")
-    case .infrastructure: return Color(hex: "#90A4AE")
-    case .lending: return Color(hex: "#FFCA28")
-    case .social: return Color(hex: "#EC407A")
-    case .wallets: return Color(hex: "#66BB6A")
-    case .overview: return Color(hex: "#DBDEE0")
-    case .other: return Color(hex: "#DBDEE0")
-    }
+    // Default tint for category icons/text in picker mode
+    return AppTheme.Colors.textSecondary
 }
 
 // Local formatter to avoid cross-file dependency
@@ -310,7 +272,7 @@ private func formatNumber(_ value: Double) -> String {
 
 #Preview {
     StatefulPreviewWrapper(true) { binding in
-        CategorieSheet(showSheet: binding, category: CategoryKind.defi, selectionStore: SharedSelectionStore(), filterViewModel: TimeFilterViewModel(), categoriesViewModel: CategoriesViewModel(), backingColor: Color(hex: "#FFD341"))
+        CategorieSheet(showSheet: binding, category: CategoryKind.defi, selectionStore: SharedSelectionStore(), filterViewModel: TimeFilterViewModel(), categoriesViewModel: CategoriesViewModel(), backingColor: Color.shade)
     }
 }
 

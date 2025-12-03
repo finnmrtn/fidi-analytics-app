@@ -21,11 +21,11 @@ public struct StackedMetricCardStyle {
         background: some ShapeStyle,
         borderColor: Color? = nil,
         iconImage: Image? = nil,
-        iconTint: Color = AppTheme.textPrimary,
+        iconTint: Color = .primary,
         title: String,
         subtitle: String? = nil,
         value: String,
-        foreground: Color = AppTheme.textPrimary,
+        foreground: Color = .primary,
         height: CGFloat = 180,
         cornerRadius: CGFloat = 38,
         shadowColor: Color = Color.black.opacity(0.18),
@@ -83,9 +83,9 @@ public struct StackedMetricCard: View {
         secondaryValueText: String? = nil,
         background: some ShapeStyle,
         iconImage: Image? = nil,
-        iconTint: Color = AppTheme.textPrimary,
+        iconTint: Color = .primary,
         borderColor: Color? = nil,
-        foreground: Color = AppTheme.textPrimary,
+        foreground: Color = .primary,
         height: CGFloat = 180,
         cornerRadius: CGFloat = 38,
         shadowColor: Color = Color.black.opacity(0.18),
@@ -167,7 +167,7 @@ public struct StackedMetricCard: View {
                     )
                     .overlay(
                         Circle()
-                            .stroke((borderColor ?? AppTheme.borderSubtle), lineWidth: 2)
+                            .stroke((borderColor ?? Color.primary.opacity(0.15)), lineWidth: 2)
                     )
                     
                     VStack(alignment: .leading, spacing: 4) {
@@ -270,11 +270,11 @@ public func formatCompactNumber(_ value: Double) -> String {
                 title: "Transactions",
                 subtitle: "Network",
                 valueText: "3.343M",
-                background: AppTheme.StackedCards.Analytics.Card0.background,
+                background: LinearGradient(colors: [.blue.opacity(0.25), .blue.opacity(0.15)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 iconImage: Image("txn"),
-                iconTint: AppTheme.StackedCards.Analytics.Card0.iconTint,
-                borderColor: AppTheme.StackedCards.Analytics.Card0.border,
-                foreground: AppTheme.StackedCards.Analytics.Card0.foreground,
+                iconTint: .blue,
+                borderColor: .blue.opacity(0.3),
+                foreground: .primary,
                 height: 180,
                 showsHandle: false
             )
@@ -284,11 +284,11 @@ public func formatCompactNumber(_ value: Double) -> String {
                 title: "UAW",
                 subtitle: "Network",
                 valueText: "144.3k",
-                background: AppTheme.StackedCards.Analytics.Card1.background,
+                background: LinearGradient(colors: [.green.opacity(0.25), .green.opacity(0.15)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 iconImage: Image("uaw"),
-                iconTint: AppTheme.StackedCards.Analytics.Card1.iconTint,
-                borderColor: AppTheme.StackedCards.Analytics.Card1.border,
-                foreground: AppTheme.StackedCards.Analytics.Card1.foreground,
+                iconTint: .green,
+                borderColor: .green.opacity(0.3),
+                foreground: .primary,
                 height: 140,
                 showsHandle: false
             )
@@ -299,11 +299,11 @@ public func formatCompactNumber(_ value: Double) -> String {
                 title: "Gas Fees",
                 subtitle: "Network",
                 valueText: "3.343M",
-                background: AppTheme.StackedCards.Analytics.Card2.background,
+                background: LinearGradient(colors: [.orange.opacity(0.25), .orange.opacity(0.15)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 iconImage: Image("gasfee"),
-                iconTint: AppTheme.StackedCards.Analytics.Card2.iconTint,
-                borderColor: AppTheme.StackedCards.Analytics.Card2.border,
-                foreground: AppTheme.StackedCards.Analytics.Card2.foreground,
+                iconTint: .orange,
+                borderColor: .orange.opacity(0.3),
+                foreground: .primary,
                 height: 100,
                 showsHandle: false
             )
@@ -314,11 +314,11 @@ public func formatCompactNumber(_ value: Double) -> String {
                 title: "Transaction Fees",
                 subtitle: "Network",
                 valueText: "19,603",
-                background: AppTheme.StackedCards.Analytics.Card3.background,
+                background: LinearGradient(colors: [.purple.opacity(0.25), .purple.opacity(0.15)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 iconImage: Image("networkfee"),
-                iconTint: AppTheme.StackedCards.Analytics.Card3.iconTint,
-                borderColor: AppTheme.StackedCards.Analytics.Card3.border,
-                foreground: AppTheme.StackedCards.Analytics.Card3.foreground,
+                iconTint: .purple,
+                borderColor: .purple.opacity(0.3),
+                foreground: .primary,
                 height: 80,
                 showsHandle: false
             )

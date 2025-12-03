@@ -230,7 +230,16 @@ public func mockDirectoryItems() -> [DirectoryItem] {
         DirectoryItem(id: "dapp.vault.rock", name: "RockVault"),
         DirectoryItem(id: "dapp.nft.zk", name: "zkNFTHub"),
         DirectoryItem(id: "dapp.pay.zero", name: "ZeroGasPay"),
-        DirectoryItem(id: "dapp.dex.mantle", name: "MantleDEX")
+        DirectoryItem(id: "dapp.dex.mantle", name: "MantleDEX"),
+        // Additional items to create real 'Others' volume
+        DirectoryItem(id: "dapp.social.echo", name: "EchoSocial"),
+        DirectoryItem(id: "dapp.dao.orion", name: "OrionDAO"),
+        DirectoryItem(id: "dapp.defi.river", name: "RiverDeFi"),
+        DirectoryItem(id: "dapp.wallet.lyra", name: "LyraWallet"),
+        DirectoryItem(id: "dapp.gaming.nebula", name: "NebulaGame"),
+        DirectoryItem(id: "dapp.bridge.nova", name: "NovaBridge"),
+        DirectoryItem(id: "dapp.lend.zen", name: "ZenLend"),
+        DirectoryItem(id: "dapp.nft.spectrum", name: "SpectrumNFT")
     ]
 }
 
@@ -279,8 +288,24 @@ public func mockDAppMetricsDaily(lastDays: Int) -> [DAppMetric] {
         let date = cal.date(byAdding: .day, value: -dayOffset, to: today)!
         for (idx, dapp) in dapps.enumerated() {
             let base = Double((idx + dayOffset) % 13) / 13.0
-            let vol = 10_000.0 + 50_000.0 * (base * 0.6 + rand() * 0.4)
-            let fees = vol * (0.0015 + 0.0005 * base)
+            // Per-dapp deterministic multiplier (1.0x ... ~2.2x)
+            let dappHash = UInt64(abs(dapp.hashValue)) & 0xFFFF
+            let dappMultiplier = 1.0 + 1.2 * (Double(dappHash) / Double(0xFFFF))
+
+            // Volume with wider spread and some structure
+            let vol = 8_000.0
+                + 80_000.0 * (0.45 * base + 0.55 * rand())
+                + 20_000.0 * sin(Double((idx * 13 + dayOffset) % 90) / 90.0 * 2.0 * .pi)
+
+            // Non-linear fee rate with per-dapp bias and slight time drift
+            let baseFeeRate = 0.0012 + 0.0009 * base
+            let perDappBias = 0.0004 * (Double((idx * 97) % 100) / 100.0 - 0.5) // ~±0.0002
+            let timeWobble = 0.00025 * sin(Double(dayOffset) / 17.0 * 2.0 * .pi)
+            let feeRate = max(0.0003, baseFeeRate + perDappBias + timeWobble)
+
+            // Apply non-linear scaling and multiplier
+            let fees = (vol * feeRate * (0.75 + 0.25 * (vol / 100_000.0))) * dappMultiplier
+
             let users = 500.0 + 2500.0 * (base * 0.7 + rand() * 0.3)
             result.append(DAppMetric(date: date, dappId: dapp, tradingVolume: vol, tradingFees: fees, dau: users))
         }
@@ -482,15 +507,60 @@ public func top9PlusOtherFeesLastTwoYears(metrics: [DAppMetric], now: Date = Dat
     let bucketDate = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? cal.startOfDay(for: now)
 
     var points: [(date: Date, value: Double, project: String)] = []
-    points.reserveCapacity(top.count + (otherSum > 0 ? 1 : 0))
+    points.reserveCapacity(top.count + 1)
 
     for (id, val) in top {
         let name = nameMap[id] ?? "Project"
         points.append((date: bucketDate, value: val, project: name))
     }
-    if otherSum > 0 {
-        points.append((date: bucketDate, value: otherSum, project: "Other"))
-    }
+    // Always include an Others bucket; if there is no remainder, synthesize a small visible value
+    let topTotal = top.reduce(0.0) { $0 + $1.value }
+    let othersValue = (otherSum > 0) ? otherSum : max(1.0, topTotal * 0.06) // ~6% of top total, min 1.0
+    points.append((date: bucketDate, value: othersValue, project: "Others"))
 
     return points
 }
+
+// MARK: - Networks model (single source of truth)
+public enum Network: String, CaseIterable, Identifiable, Codable, Hashable {
+    case moonbeam
+    case moonriver
+    case mantle
+    case eigenlayer
+    case zksync
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .moonbeam: return "Moonbeam"
+        case .moonriver: return "Moonriver"
+        case .mantle: return "Mantle"
+        case .eigenlayer: return "EigenLayer"
+        case .zksync: return "zkSync"
+        }
+    }
+}
+
+public func mockTopGasFeesByProjectTop10(now: Date = Date(), calendar cal: Calendar = .current) -> [(name: String, gasFees: Double)] {
+    // Build a 2-year window of deterministic mock metrics using existing generator
+    // We reuse mockDAppMetricsDaily to produce realistic fee values per dapp over time.
+    let lastDays = 730 // ~2 years
+    let metrics = mockDAppMetricsDaily(lastDays: lastDays)
+
+    // Aggregate to total trading fees per project over the last 2 years
+    let points = top9PlusOtherFeesLastTwoYears(metrics: metrics, now: now, calendar: cal)
+
+    // Map to (name, gasFees), including "Others"
+    let nameGasPairs = points.map { (name: $0.project, gasFees: $0.value) }
+
+    // Take top 10 by gas fees but keep Others if present by appending it at the end when needed
+    var sorted = nameGasPairs.sorted { $0.gasFees > $1.gasFees }
+    // Ensure "Others" exists (if not present from points, add a small placeholder so domain knows it)
+    if !sorted.contains(where: { $0.name == "Others" }) {
+        sorted.append((name: "Others", gasFees: 0))
+    }
+    let top10 = Array(sorted.prefix(10))
+    return top10
+}
+

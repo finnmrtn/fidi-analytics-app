@@ -63,22 +63,25 @@ struct TransactionsSheet: View {
                 rows.reduce(0) { $0 + ($1.tradingFees ?? 0) }
             }
             
-            // Build Top 9 parts in rank order with fixed colors
-            let partsTop: [(String, Double, Color)] = topIds.enumerated().compactMap { (idx, id) in
+            // Build Top 9 parts in rank order with fixed colors (immer alle Top-IDs, fehlende => 0)
+            let partsTop: [(String, Double, Color)] = topIds.enumerated().map { (idx, id) in
                 let name = nameById[id] ?? "Project"
-                let value = perDapp[id] ?? 0
-                guard value > 0 else { return nil }
+                let value = max(0, perDapp[id] ?? 0)
                 let color = ChartTheme.transactionsColors[min(idx, ChartTheme.transactionsColors.count - 1)]
                 return (name, value, color)
             }
-            // Compute Others for all non-top ids in this bucket
+            
+            // Compute Others (alle Nicht-Top-IDs)
             let othersValue = rows.reduce(0.0) { acc, row in
                 acc + (topIds.contains(row.dappId) ? 0.0 : (row.tradingFees ?? 0.0))
             }
-            var partsWithOthers = partsTop
-            if othersValue > 0 {
-                partsWithOthers.append(("Others", othersValue, ChartTheme.transactionsColors.last ?? .gray))
-            }
+            
+            // Others immer hinzufügen (auch wenn 0), und zwar als unterster Stack (als erstes Element)
+            let othersColor = Color("GraphColor10")
+            var partsWithOthers: [(String, Double, Color)] = []
+            partsWithOthers.append(("Others", max(0, othersValue), othersColor))
+            partsWithOthers.append(contentsOf: partsTop)
+            
             guard !partsWithOthers.isEmpty else { return nil }
             return (key, partsWithOthers)
         }
@@ -144,44 +147,36 @@ struct TransactionsSheet: View {
                 onClose: { showSheet = false },
                 onOpenFilter: { showFilterPopup = true },
                 icon: Image("txn"),
-                iconTint: AppTheme.Sheets.Transactions.iconTint,
-                iconStrokeColor: AppTheme.Sheets.Transactions.iconStroke,
-                backgroundColor: AppTheme.Sheets.Transactions.background
+                iconTint: Color(hex: "#2F2F2F"),
+                iconStrokeColor: Color(hex: "#DCDEE1"),
+                backgroundColor: Color(hex: "#2F2F2F")
             ) {
                 ZStack(alignment: .top) {
                     RoundedRectangle(cornerRadius: 20)
                         .fill(Color.white)
                         .overlay(
                             VStack(spacing: 0) {
-                                if let selectedDate {
-                                    ChartTooltip(
-                                        date: selectedDate,
-                                        rows: seriesForDate(selectedDate).map { ChartTooltipRow(color: $0.color, name: $0.name, value: $0.value) },
-                                        formatValue: { value in
-                                            formatAbbreviated(value, asCurrency: true)
-                                        },
-                                        formatDate: { date in
-                                            Self.longDayMonthYearFormatter.string(from: date)
-                                        },
-                                        formatTime: { date in
-                                            Self.timeFormatter.string(from: date)
-                                        }
-                                    )
-                                }
+                                // Removed if let selectedDate { ChartTooltip(...) } block here
 
                                 if hasValidChartData {
-                                    TransactionsStackedChart(
-                                        selectedDate: $selectedDate,
-                                        selectedXPosition: $selectedXPosition,
-                                        series: stackedSeries.map { (date, parts) in
-                                            StackedSeriesPoint(date: date, parts: parts.map { StackedSeriesPart(name: $0.0, value: $0.1, color: $0.2) })
-                                        },
-                                        bucketer: bucketer,
-                                        currentBucket: currentBucket,
-                                        style: .stackedArea
-                                    )
-                                    .frame(height: 280)
-                                    .padding(.bottom, 8)
+                                    VStack(spacing: 0) {
+                                        Spacer(minLength: 0)
+                                        TransactionsStackedChart(
+                                            selectedDate: $selectedDate,
+                                            selectedXPosition: $selectedXPosition,
+                                            series: stackedSeries.map { (date, parts) in
+                                                StackedSeriesPoint(date: date, parts: parts.map { StackedSeriesPart(name: $0.0, value: $0.1, color: $0.2) })
+                                            },
+                                            bucketer: bucketer,
+                                            currentBucket: currentBucket,
+                                            style: .stackedArea
+                                        )
+                                        .frame(height: 260)
+                                        .padding(.bottom, 0)
+                                    }
+                                    .frame(maxHeight: .infinity, alignment: .bottom)
+                                    .padding(.bottom, 80)
+                                
                                 } else {
                                     VStack(spacing: 12) {
                                         Image(systemName: "chart.bar.xaxis")
@@ -199,9 +194,29 @@ struct TransactionsSheet: View {
                                 }
                             }
                         )
+                        .overlay(alignment: .topLeading) {
+                            if let selectedDate {
+                                ChartTooltip(
+                                    date: selectedDate,
+                                    rows: seriesForDate(selectedDate).map { ChartTooltipRow(color: $0.color, name: $0.name, value: $0.value) },
+                                    formatValue: { value in
+                                        formatAbbreviated(value, asCurrency: true)
+                                    },
+                                    formatDate: { date in
+                                        Self.longDayMonthYearFormatter.string(from: date)
+                                    },
+                                    formatTime: { date in
+                                        Self.timeFormatter.string(from: date)
+                                    }
+                                )
+                                .padding(.top, 8)
+                                .zIndex(10)
+                            }
+                        }
                 }
             }
         }.padding(16)
+         
     
     }
 
@@ -234,3 +249,4 @@ struct TransactionsSheet: View {
         }
     }
 }
+

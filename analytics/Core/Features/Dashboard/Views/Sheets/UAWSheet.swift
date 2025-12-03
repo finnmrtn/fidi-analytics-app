@@ -71,9 +71,9 @@ struct UAWSheet: View {
             onClose: { showSheet = false },
             onOpenFilter: { showFilterPopup = true },
             icon: Image("uaw"),
-            iconTint: AppTheme.Sheets.UAW.iconTint,
-            iconStrokeColor: AppTheme.Sheets.UAW.iconStroke,
-            backgroundColor: AppTheme.Sheets.UAW.background
+            iconTint: Color(hex: "#2F2F2F"),
+            iconStrokeColor: Color(hex: "#DCDEE1"),
+            backgroundColor: Color(hex: "#2F2F2F")
         ) {
             StackedBarChartView(
                 data: data,
@@ -82,8 +82,7 @@ struct UAWSheet: View {
                 minHeight: 280
             )
             .layoutPriority(1)
-        }
-        .padding(16)
+        }.padding(16)
     }
 }
 

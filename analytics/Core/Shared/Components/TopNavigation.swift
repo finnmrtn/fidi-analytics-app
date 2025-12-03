@@ -29,10 +29,12 @@ struct TopNavigation: View {
 
             Button(action: { showProjectSelector = true }) {
                 HStack(spacing: 8) {
+                    // Avoid dynamic member lookup on Binding; compute concrete asset name string
+                    let name = networkAssetName(for: selectedNetwork)
                     Group {
                         #if os(iOS) || os(tvOS) || os(visionOS)
-                        if UIImage(named: selectedNetwork.iconName) != nil {
-                            Image(selectedNetwork.iconName)
+                        if UIImage(named: name) != nil {
+                            Image(name)
                                 .resizable()
                                 .renderingMode(.original)
                                 .frame(width: 18, height: 18)
@@ -42,8 +44,8 @@ struct TopNavigation: View {
                                 .foregroundStyle(.secondary)
                         }
                         #elseif os(macOS)
-                        if NSImage(named: NSImage.Name(selectedNetwork.iconName)) != nil {
-                            Image(selectedNetwork.iconName)
+                        if NSImage(named: NSImage.Name(name)) != nil {
+                            Image(name)
                                 .resizable()
                                 .renderingMode(.original)
                                 .frame(width: 18, height: 18)
@@ -53,7 +55,7 @@ struct TopNavigation: View {
                                 .foregroundStyle(.secondary)
                         }
                         #else
-                        Image(selectedNetwork.iconName)
+                        Image(name)
                             .resizable()
                             .renderingMode(.original)
                             .frame(width: 18, height: 18)
@@ -134,3 +136,13 @@ struct TopNavigation: View {
     }
 }
 
+private func networkAssetName(for network: Network) -> String {
+    switch network {
+    case .moonbeam: return "moonbeam"
+    case .moonriver: return "moonriver"
+    case .mantle: return "mantle"
+    case .eigenlayer: return "eigenlayer"
+    case .zksync: return "zksync"
+    @unknown default: return network.rawValue.lowercased()
+    }
+}

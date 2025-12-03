@@ -38,12 +38,20 @@ public struct ChartTooltip: View {
                 }
             }
         }
-        .padding(8)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.ultraThinMaterial)
-                .shadow(radius: 1)
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.thinMaterial)
+            }
         )
+       
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(.white.opacity(0.12))
+        )
+        .shadow(radius: 0.5)
+     
         .fixedSize(horizontal: false, vertical: true)
     }
 }

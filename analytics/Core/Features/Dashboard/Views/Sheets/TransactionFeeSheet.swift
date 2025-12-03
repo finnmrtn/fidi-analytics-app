@@ -38,9 +38,9 @@ struct TransactionFeeSheet: View {
             onClose: { showSheet = false },
             onOpenFilter: { showFilterPopup = true },
             icon: Image("networkfee"),
-            iconTint: AppTheme.Sheets.TransactionFees.iconTint,
-            iconStrokeColor: AppTheme.Sheets.TransactionFees.iconStroke,
-            backgroundColor: AppTheme.Sheets.TransactionFees.background
+            iconTint: Color(hex: "#2F2F2F"),
+            iconStrokeColor: Color(hex: "#DCDEE1"),
+            backgroundColor: Color(hex: "#2F2F2F")
         ) {
             StackedBarChartView(
                 data: data,

@@ -163,7 +163,7 @@ struct SearchView: View {
                 .toolbarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { showProjectSelector = false } label: { Image(systemName: "xmark") } } }
             }
-            .presentationDetents([.large])
+            .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
         }

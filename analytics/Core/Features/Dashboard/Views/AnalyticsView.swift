@@ -58,7 +58,7 @@ struct MainTabView: View {
             }
             .tag(2)
         }
-        .tint(AppTheme.namedColor("BrandColor", fallback: Color(hex: "#7E88FF")))
+        .tint(Color(hex: "#7E88FF"))
         .onChange(of: selectedTab) { _ in
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.impactOccurred()
@@ -79,13 +79,6 @@ struct DashboardView: View {
     @State private var showTxFeesSheet = false
     @State private var selectedGLMRPrice: Double? = nil
     @State private var filterSheetHeight: CGFloat = 420
-
-    private var selectedNetworkBinding: Binding<Network> {
-        Binding(
-            get: { selectionStore.selectedNetwork ?? .moonbeam },
-            set: { selectionStore.selectedNetwork = $0 }
-        )
-    }
 
     init(selectionStore: SharedSelectionStore) {
         self.selectionStore = selectionStore
@@ -120,7 +113,10 @@ struct DashboardView: View {
                 VStack(spacing: 0) {
                     VStack(spacing: 8) {
                         TopNavSection(
-                            selectedNetwork: selectedNetworkBinding,
+                            selectedNetwork: Binding(
+                                get: { selectionStore.selectedNetwork },
+                                set: { selectionStore.selectedNetwork = $0 }
+                            ),
                             showProjectSelector: $showProjectSelector,
                             showsTimeFilter: true,
                             selectionStore: selectionStore,
@@ -216,10 +212,16 @@ struct DashboardView: View {
             .presentationCornerRadius(24)
         }
         .sheet(isPresented: $showProjectSelector) {
-            NetworkSelectorView(selectedNetwork: selectedNetworkBinding, isPresented: $showProjectSelector)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(24)
+            NetworkSelectorView(
+                selectedNetwork: Binding(
+                    get: { selectionStore.selectedNetwork },
+                    set: { selectionStore.selectedNetwork = $0 }
+                ),
+                isPresented: $showProjectSelector
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
         }
         .sheet(isPresented: $showTransactionsSheet) {
             TransactionsSheet(
@@ -282,11 +284,11 @@ struct DashboardView: View {
                         title: "Transactions",
                         subtitle: "Network",
                         valueText: "3.343M",
-                        background: AppTheme.StackedCards.Analytics.Card0.background,
+                        background: Color.brand,
                         iconImage: Image("txn"),
-                        iconTint: AppTheme.StackedCards.Analytics.Card0.iconTint,
-                        borderColor: AppTheme.StackedCards.Analytics.Card0.border,
-                        foreground: AppTheme.StackedCards.Analytics.Card0.foreground,
+                        iconTint: Color.white,
+                        borderColor: Color.white.opacity(0.15),
+                        foreground: Color.maintext,
                         height: 180
                     )
                 }
@@ -299,11 +301,11 @@ struct DashboardView: View {
                         title: "UAW",
                         subtitle: "Network",
                         valueText: "144.3k",
-                        background: AppTheme.StackedCards.Analytics.Card1.background,
+                        background: Color(hex: "C5CBFF"),
                         iconImage: Image("uaw"),
-                        iconTint: AppTheme.StackedCards.Analytics.Card1.iconTint,
-                        borderColor: AppTheme.StackedCards.Analytics.Card1.border,
-                        foreground: AppTheme.StackedCards.Analytics.Card1.foreground,
+                        iconTint: Color(hex: "3B4491"),
+                        borderColor: Color(hex: "3B4491", alpha: 0.15),
+                        foreground: Color(hex: "3B4491"),
                         height: 140
                     )
                 }
@@ -318,11 +320,11 @@ struct DashboardView: View {
                         title: "Gas Fees",
                         subtitle: "Network",
                         valueText: "3.343M",
-                        background: AppTheme.StackedCards.Analytics.Card2.background,
+                        background: Color.shade,
                         iconImage: Image("gasfee"),
-                        iconTint: AppTheme.StackedCards.Analytics.Card2.iconTint,
-                        borderColor: AppTheme.StackedCards.Analytics.Card2.border,
-                        foreground: AppTheme.StackedCards.Analytics.Card2.foreground,
+                        iconTint: Color.subtext,
+                        borderColor: Color.highlight,
+                        foreground: Color.black,
                         height: 100
                     )
                 }
@@ -337,11 +339,11 @@ struct DashboardView: View {
                         title: "Transaction Fees",
                         subtitle: "Network",
                         valueText: "19,603",
-                        background: AppTheme.StackedCards.Analytics.Card3.background,
+                        background: Color.backing,
                         iconImage: Image("networkfee"),
-                        iconTint: AppTheme.StackedCards.Analytics.Card3.iconTint,
-                        borderColor: AppTheme.StackedCards.Analytics.Card3.border,
-                        foreground: AppTheme.StackedCards.Analytics.Card3.foreground,
+                        iconTint: Color(hex: "#FF4245"),
+                        borderColor: Color(hex: "#FF4245", alpha: 0.15),
+                        foreground: Color.black,
                         height: 100
                     )
                 }
@@ -378,7 +380,10 @@ struct DashboardView: View {
 
         var body: some View {
             TopNavigation(
-                selectedNetwork: $selectedNetwork,
+                selectedNetwork: Binding(
+                    get: { selectionStore.selectedNetwork },
+                    set: { selectionStore.selectedNetwork = $0 }
+                ),
                 showProjectSelector: $showProjectSelector,
                 showsTimeFilter: showsTimeFilter,
                 selectionStore: selectionStore,

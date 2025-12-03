@@ -1,37 +1,7 @@
 import Foundation
 import Combine
 
-// Local shim for Network until shared model is integrated
-// Make sure it matches usage across views (allCases, rawValue, displayName, iconName)
-enum Network: String, CaseIterable, Codable, Hashable, Identifiable {
-    case moonbeam
-    case moonriver
-    case mantle
-    case eigenlayer
-    case zksync
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .moonbeam: return "Moonbeam"
-        case .moonriver: return "Moonriver"
-        case .mantle: return "Mantle"
-        case .eigenlayer: return "EigenLayer"
-        case .zksync: return "zkSync"
-        }
-    }
-
-    var iconName: String {
-        switch self {
-        case .moonbeam: return "moonbeam"
-        case .moonriver: return "moonriver"
-        case .mantle: return "mantle"
-        case .eigenlayer: return "eigenlayer"
-        case .zksync: return "zksync"
-        }
-    }
-}
+// Using shared Network from MockData.swift
 
 enum TimePreset: Equatable {
     case oneWeek
